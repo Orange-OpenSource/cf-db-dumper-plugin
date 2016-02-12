@@ -101,7 +101,7 @@ func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 		Commands: []plugin.Command{
 			plugin.Command{
 				Name:     "db-dumper",
-				HelpText: "helpText",
+				HelpText: helpText,
 
 				// UsageDetails is optional
 				// It is used to show help of usage of each command
