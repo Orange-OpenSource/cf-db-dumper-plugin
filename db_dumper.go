@@ -16,6 +16,10 @@ import (
 *
  */
 type BasicPlugin struct{}
+var version_major int = 1
+var version_minor int = 0
+var version_build int = 0
+var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
 func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 	// Ensure that we called the command basic-plugin-command
@@ -24,13 +28,13 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 	}
 	app := cli.NewApp()
 	app.Name = "db-dumper"
-	app.Version = "1.0.0"
+	app.Version = fmt.Sprintf("%d.%d.%d", version_major, version_minor, version_build)
 	app.Usage = "Help you to manipulate db-dumper service"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name: "name, n",
 			Value: db_dumper.SERVICE_NAME,
-			Usage: "set the service name of your db-dumper-service",
+			Usage: helpText,
 			Destination: &serviceName,
 		},
 	}
@@ -85,9 +89,9 @@ func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 	return plugin.PluginMetadata{
 		Name: "db-dumper",
 		Version: plugin.VersionType{
-			Major: 1,
-			Minor: 0,
-			Build: 0,
+			Major: version_major,
+			Minor: version_minor,
+			Build: version_build,
 		},
 		MinCliVersion: plugin.VersionType{
 			Major: 6,
@@ -97,7 +101,7 @@ func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 		Commands: []plugin.Command{
 			plugin.Command{
 				Name:     "db-dumper",
-				HelpText: "Help you to manipulate db-dumper service",
+				HelpText: "helpText",
 
 				// UsageDetails is optional
 				// It is used to show help of usage of each command
