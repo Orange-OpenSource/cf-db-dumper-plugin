@@ -21,6 +21,12 @@ var version_minor int = 0
 var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
+var showUrl bool
+var recent bool
+var skipInsecure bool
+var inStdout bool
+var dumpNumber string
+var verboseMode bool
 func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 	// Ensure that we called the command basic-plugin-command
 	if args[0] != "db-dumper" {
@@ -37,6 +43,11 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Usage: helpText,
 			Destination: &serviceName,
 		},
+		cli.BoolFlag{
+			Name: "verbose, vvv, vv",
+			Usage: "Set the flag if you want to see all output from cloudfoundry cli",
+			Destination: &verboseMode,
+		},
 	}
 	app.Action = func(c *cli.Context) {
 		println("Hello friend!")
@@ -52,7 +63,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 				if len(cg.Args()) == 0 {
 					checkError(errors.New("you must provide a service name or an url to a database"))
 				}
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection)
+				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 				err := dbDumperManager.CreateDump(cg.Args().First())
 				checkError(err)
 			},
@@ -60,14 +71,21 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 		{
 			Name:      "restore",
 			Aliases:     []string{"r"},
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name: "recent",
+					Usage: "Restore from the most recent dump",
+					Destination: &recent,
+				},
+			},
 			Usage:     "Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
 			ArgsUsage: "[service-name-or-url-of-your-db]",
 			Action: func(cg *cli.Context) {
 				if len(cg.Args()) == 0 {
 					checkError(errors.New("you must provide a service name or an url to a target database"))
 				}
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection)
-				err := dbDumperManager.RestoreDump(cg.Args().First())
+				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
+				err := dbDumperManager.RestoreDump(cg.Args().First(), recent)
 				checkError(err)
 			},
 		},
@@ -76,9 +94,86 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Aliases:     []string{"d"},
 			Usage:     "Delete a instance and all his dumps (dumps can be retrieve during a period)",
 			Action: func(cg *cli.Context) {
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection)
+				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 				err := dbDumperManager.DeleteDump()
 				checkError(err)
+			},
+		},
+		{
+			Name:      "list",
+			Aliases:     []string{"l"},
+			Usage:     "List dumps for an instance",
+			ArgsUsage: "[service instance](optionnal)",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name: "show-url, s",
+					Usage: "If you want to see download url and dashboard url",
+					Destination: &showUrl,
+				},
+			},
+			Action: func(cg *cli.Context) {
+				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
+
+				if len(cg.Args()) > 0 {
+					err := dbDumperManager.ListFromInstanceName(cg.Args().First(), showUrl)
+					if err != nil {
+						prefix, err := dbDumperManager.GetNamePrefix()
+						checkError(err)
+						suffix, _ := dbDumperManager.GetNameSuffix()
+						err = dbDumperManager.ListFromInstanceName(prefix + cg.Args().First() + suffix, showUrl)
+					}
+					checkError(err)
+				}else {
+					err := dbDumperManager.List(showUrl)
+					checkError(err)
+				}
+
+			},
+		},
+		{
+			Name:      "download",
+			Aliases:     []string{"dl"},
+			Usage:     "Download a dump to your drive",
+			ArgsUsage: "[service instance](optionnal)",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name: "skip-ssl-validation, k",
+					Usage: "Skip the ssl validation (for self-signed certificate mainly)",
+					Destination: &skipInsecure,
+				},
+				cli.BoolFlag{
+					Name: "recent",
+					Usage: "Download from the most recent dump",
+					Destination: &recent,
+				},
+				cli.StringFlag{
+					Name: "dump-number, p",
+					Usage: "Download from the number showed when using 'db-dumper list'",
+					Value: "",
+					Destination: &dumpNumber,
+				},
+				cli.BoolFlag{
+					Name: "stdout, o",
+					Usage: "Show file directly in stdout (service instance is no more optionnal and you need to use flag --dump-number or --recent)",
+					Destination: &inStdout,
+				},
+			},
+			Action: func(cg *cli.Context) {
+				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
+				if len(cg.Args()) > 0 {
+					err := dbDumperManager.DownloadDumpFromInstanceName(cg.Args().First(), skipInsecure, recent, inStdout, dumpNumber)
+					if err != nil {
+						prefix, err := dbDumperManager.GetNamePrefix()
+						checkError(err)
+						suffix, _ := dbDumperManager.GetNameSuffix()
+						err = dbDumperManager.DownloadDumpFromInstanceName(prefix + cg.Args().First() + suffix, skipInsecure, recent, inStdout, dumpNumber)
+						checkError(err)
+					}
+				}else {
+					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, dumpNumber)
+					checkError(err)
+				}
+
 			},
 		},
 	}
@@ -118,6 +213,9 @@ func checkError(err error) {
 		ct.Foreground(ct.Red, false)
 		fmt.Println(fmt.Sprintf("%v", err))
 		ct.ResetColor()
+		if verboseMode == false {
+			fmt.Println("Tip: use --verbose to see what's going wrong with cf core command")
+		}
 		os.Exit(1)
 
 	}

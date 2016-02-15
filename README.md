@@ -18,10 +18,13 @@ COMMANDS:
    create, c	Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
    restore, r	Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
    delete, d	Delete a instance and all his dumps (dumps can be retrieve during a period)
+   list, l	List dumps for an instance
+   download, dl	Download a dump to your drive
    help, h	Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --name, -n "db-dumper-service"	set the service name of your db-dumper-service
+   --name, -n "db-dumper-service"	Help you to manipulate db-dumper service
+   --verbose, --vvv, --vv		Set the flag if you want to see all output from cloudfoundry cli
    --help, -h				show help
    --version, -v			print the version
 ```
@@ -43,7 +46,10 @@ NAME:
    db-dumper restore - Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
 
 USAGE:
-   db-dumper restore [service-name-or-url-of-your-db]
+   db-dumper restore [command options] [service-name-or-url-of-your-db]
+
+OPTIONS:
+   --recent	Restore from the most recent dump
 ```
 
 ### Delete
@@ -54,4 +60,33 @@ NAME:
 
 USAGE:
    db-dumper delete [arguments...]
+```
+
+### List
+
+```
+NAME:
+   db-dumper list - List dumps for an instance
+
+USAGE:
+   db-dumper list [command options] [service instance](optionnal)
+
+OPTIONS:
+   --show-url, -s	If you want to see download url and dashboard url
+```
+
+### Download
+
+```
+NAME:
+   db-dumper download - Download a dump to your drive
+
+USAGE:
+   db-dumper download [command options] [service instance](optionnal)
+
+OPTIONS:
+   --skip-ssl-validation, -k	Skip the ssl validation (for self-signed certificate mainly)
+   --recent			Download from the most recent dump
+   --dump-number, -p 		Download from the number showed when using 'db-dumper list'
+   --stdout, -o			Show file directly in stdout (service instance is no more optionnal and you need to use flag --dump-number or --recent)
 ```
