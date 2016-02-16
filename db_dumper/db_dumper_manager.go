@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"github.com/satori/go.uuid"
 	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper/model"
-	"github.com/docker/docker/vendor/src/github.com/jfrazelle/go/canonical/json"
+	"encoding/json"
 	"github.com/olekukonko/tablewriter"
 	"crypto/md5"
 	"encoding/hex"
