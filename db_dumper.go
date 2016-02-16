@@ -121,8 +121,8 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						checkError(err)
 						suffix, _ := dbDumperManager.GetNameSuffix()
 						err = dbDumperManager.ListFromInstanceName(prefix + cg.Args().First() + suffix, showUrl)
+						checkError(err)
 					}
-					checkError(err)
 				}else {
 					err := dbDumperManager.List(showUrl)
 					checkError(err)
@@ -171,6 +171,42 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					}
 				}else {
 					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, dumpNumber)
+					checkError(err)
+				}
+
+			},
+		},
+		{
+			Name:      "open",
+			Aliases:  []string{"o"},
+			Usage:     "Open dump in your browser",
+			ArgsUsage: "[service instance](optionnal)",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name: "recent",
+					Usage: "Open dump page from the most recent dump",
+					Destination: &recent,
+				},
+				cli.StringFlag{
+					Name: "dump-number, p",
+					Usage: "Open from the number showed when using 'db-dumper list'",
+					Value: "",
+					Destination: &dumpNumber,
+				},
+			},
+			Action: func(cg *cli.Context) {
+				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
+				if len(cg.Args()) > 0 {
+					err := dbDumperManager.ShowDumpFromInstanceName(cg.Args().First(), recent, dumpNumber)
+					if err != nil {
+						prefix, err := dbDumperManager.GetNamePrefix()
+						checkError(err)
+						suffix, _ := dbDumperManager.GetNameSuffix()
+						err = dbDumperManager.ShowDumpFromInstanceName(prefix + cg.Args().First() + suffix, recent, dumpNumber)
+						checkError(err)
+					}
+				}else {
+					err := dbDumperManager.ShowDump(recent, dumpNumber)
 					checkError(err)
 				}
 

@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"io"
 	"github.com/cheggaaa/pb"
+	"github.com/skratchdot/open-golang/open"
 )
 type DbDumperManager struct {
 	cliConnection plugin.CliConnection
@@ -74,7 +75,174 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string) error {
 	_, err = this.cliConnection.CliCommand(command...)
 	return err
 }
+func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, recent bool) error {
+	serviceInstance, err := this.selectService("Which instance do you want to restore to '" + target_service_name_or_url + "' ?")
+	if err != nil {
+		return err
+	}
+	createdAt := ""
+	if recent == false {
+		dumps, err := this.getDumps(serviceInstance)
+		if err != nil {
+			return err
+		}
+		createdAt, err = this.selectDumpDate(serviceInstance, dumps, "At which date do you want to restore ?")
+		if err != nil {
+			return err
+		}
+	}
 
+	command := strings.Split(fmt.Sprintf(command_restore_dump, serviceInstance), " ")
+	command = append(command, fmt.Sprintf(json_restore, target_service_name_or_url, createdAt))
+	_, err = this.cliConnection.CliCommand(command...)
+	return err
+}
+func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdout bool, dumpDateOrNumber string) error {
+	if inStdout {
+		return errors.New("To use stdout option you need to pass a service instance.")
+	}
+	serviceInstance, err := this.selectService("Which instance to list ?")
+	if err != nil {
+		return err
+	}
+	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, dumpDateOrNumber)
+}
+func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, dumpDateOrNumber string) error {
+
+	if inStdout && dumpDateOrNumber == "" && !recent {
+		return errors.New("stdout option can only be use with flag --dump-number or --recent")
+	}
+	selectedDump, err := this.selectDump(serviceInstance, recent, dumpDateOrNumber)
+	if err != nil {
+		return err
+	}
+	var tlsConfig *tls.Config
+	if skipInsecure {
+		tlsConfig = &tls.Config{InsecureSkipVerify: skipInsecure}
+	}
+	var transport http.RoundTripper
+
+	transport = &http.Transport{
+		TLSClientConfig: tlsConfig,
+		Proxy: http.ProxyFromEnvironment,
+	}
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	resp, err := client.Get(selectedDump.DownloadURL)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return errors.New("Dump can't be downloaded, http status code: " + strconv.Itoa(resp.StatusCode))
+	}
+	fmt.Println("")
+	if inStdout {
+		io.Copy(os.Stdout, resp.Body)
+	}else {
+		bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
+		bar.Start()
+		out, err := os.Create(selectedDump.Filename)
+		if err != nil {
+			return err
+		}
+		reader := bar.NewProxyReader(resp.Body)
+		io.Copy(out, reader)
+		bar.Update()
+	}
+
+	fmt.Println("")
+	if !inStdout {
+		fmt.Println("")
+		fmt.Print("File as been downloaded in ")
+		ct.Foreground(ct.Blue, false)
+		fmt.Print(selectedDump.Filename)
+		ct.ResetColor()
+		fmt.Println(" file")
+	}
+	return nil
+}
+func (this *DbDumperManager) ShowDump(recent bool, dumpDateOrNumber string) error {
+	serviceInstance, err := this.selectService("Which instance to list ?")
+	if err != nil {
+		return err
+	}
+	return this.ShowDumpFromInstanceName(serviceInstance, recent, dumpDateOrNumber)
+}
+func (this *DbDumperManager) ShowDumpFromInstanceName(serviceInstance string, recent bool, dumpDateOrNumber string) error {
+	selectedDump, err := this.selectDump(serviceInstance, recent, dumpDateOrNumber)
+	if err != nil {
+		return err
+	}
+	if selectedDump.ShowURL == "" {
+		return errors.New("This dump cannot be showed, generally this mean that the file is only in binary.")
+	}
+	return open.Run(selectedDump.ShowURL)
+}
+func (this *DbDumperManager) List(showUrl bool) error {
+	serviceInstance, err := this.selectService("Which instance to list ?")
+	if err != nil {
+		return err
+	}
+	return this.ListFromInstanceName(serviceInstance, showUrl)
+}
+func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUrl bool) error {
+
+	dumps, err := this.getDumps(serviceInstance)
+	if err != nil {
+		return err
+	}
+	return this.ListFromInstanceNameWithDumps(serviceInstance, showUrl, dumps)
+}
+func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance string, showUrl bool, dumps []model.Dump) error {
+	fmt.Println("")
+	headers := []string{"#", "File Name", "Created At"}
+
+	if showUrl {
+		headers = append(headers, "Download Url")
+		headers = append(headers, "Dashboard Url")
+
+	}
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(headers)
+	for index, dump := range dumps {
+		var data []string
+		if showUrl {
+			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, dump.DownloadURL, dump.ShowURL}
+		}else {
+			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt}
+		}
+		table.Append(data)
+	}
+	table.Render()
+	return nil
+}
+func (this *DbDumperManager) DeleteDump() error {
+	serviceInstance, err := this.selectService("Which instance do you want to delete ? (dump will be really delete after a determined period)")
+	if err != nil {
+		return err
+	}
+	command := strings.Split(fmt.Sprintf(command_delete_dumps, serviceInstance), " ")
+	_, err = this.cliConnection.CliCommand(command...)
+	return err
+}
+func (this *DbDumperManager) GetNamePrefix() (string, error) {
+	org, err := this.cliConnection.GetCurrentOrg()
+	if err != nil {
+		return "", err
+	}
+	space, err := this.cliConnection.GetCurrentSpace()
+	if err != nil {
+		return "", err
+	}
+	hash := md5.Sum([]byte(org.Name + "-" + space.Name + "-"))
+	md5String := hex.EncodeToString(hash[:])
+	return md5String[:8], nil
+}
+func (this *DbDumperManager) GetNameSuffix() (string, error) {
+	return service_name_suffix, nil
+}
 func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeList []string, defaultValueName, defaultValue string) (string, error) {
 	fmt.Println("Available " + typeToSelect + ":")
 
@@ -120,28 +288,7 @@ func (this *DbDumperManager) selectDumpDate(serviceInstance string, dumps []mode
 	}
 	return this.selectByUser("dump dates", msg, dates, "recent", "")
 }
-func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, recent bool) error {
-	serviceInstance, err := this.selectService("Which instance do you want to restore to '" + target_service_name_or_url + "' ?")
-	if err != nil {
-		return err
-	}
-	createdAt := ""
-	if recent == false {
-		dumps, err := this.getDumps(serviceInstance)
-		if err != nil {
-			return err
-		}
-		createdAt, err = this.selectDumpDate(serviceInstance, dumps, "At which date do you want to restore ?")
-		if err != nil {
-			return err
-		}
-	}
 
-	command := strings.Split(fmt.Sprintf(command_restore_dump, serviceInstance), " ")
-	command = append(command, fmt.Sprintf(json_restore, target_service_name_or_url, createdAt))
-	_, err = this.cliConnection.CliCommand(command...)
-	return err
-}
 func (this *DbDumperManager) selectService(msg string) (string, error) {
 
 	if !this.isDbDumperServiceExist() {
@@ -209,27 +356,17 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 	}
 	return serviceInstance, nil
 }
-func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdout bool, dumpDateOrNumber string) error {
-	if inStdout {
-		return errors.New("To use stdout option you need to pass a service instance.")
-	}
-	serviceInstance, err := this.selectService("Which instance to list ?")
-	if err != nil {
-		return err
-	}
-	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, dumpDateOrNumber)
-}
-func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, dumpDateOrNumber string) error {
+func (this *DbDumperManager) selectDump(serviceInstance string, recent bool, dumpDateOrNumber string) (model.Dump, error) {
 	dumps, err := this.getDumps(serviceInstance)
 	if err != nil {
-		return err
+		return model.Dump{}, err
 	}
 	createdAt := dumpDateOrNumber
 	if index, err := strconv.Atoi(dumpDateOrNumber); err == nil {
 		if index < len(dumps) && index >= 0 {
 			createdAt = dumps[index].CreatedAt
 		}else {
-			return errors.New("Dump number " + dumpDateOrNumber + " is not valid. (use 'db-dumper list')")
+			return model.Dump{}, errors.New("Dump number " + dumpDateOrNumber + " is not valid. (use 'db-dumper list')")
 		}
 	}
 	if dumpDateOrNumber != "" && createdAt == "" && !recent {
@@ -237,13 +374,10 @@ func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string
 	}else if recent {
 		createdAt = dumps[0].CreatedAt
 	}
-	if inStdout && dumpDateOrNumber == "" && !recent {
-		return errors.New("stdout option can only be use with flag --dump-number or --recent")
-	}
 	if !recent && createdAt == "" {
 		createdAt, err = this.selectDumpDate(serviceInstance, dumps, "At which date do you want your dump file ?")
 		if err != nil {
-			return err
+			return model.Dump{}, err
 		}
 		if createdAt == "" {
 			createdAt = dumps[0].CreatedAt
@@ -257,93 +391,11 @@ func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string
 		}
 	}
 	if selectedDump == (model.Dump{}) {
-		return errors.New("The dump at the date of " + createdAt + " doesn't exist")
+		return model.Dump{}, errors.New("The dump at the date of " + createdAt + " doesn't exist")
 	}
-	var tlsConfig *tls.Config
-	if skipInsecure {
-		tlsConfig = &tls.Config{InsecureSkipVerify: skipInsecure}
-	}
-	var transport http.RoundTripper
-
-	transport = &http.Transport{
-		TLSClientConfig: tlsConfig,
-		Proxy: http.ProxyFromEnvironment,
-	}
-	client := &http.Client{
-		Transport: transport,
-	}
-
-	resp, err := client.Get(selectedDump.DownloadURL)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return errors.New("Dump can't be downloaded, http status code: " + strconv.Itoa(resp.StatusCode))
-	}
-	fmt.Println("")
-	if inStdout {
-		io.Copy(os.Stdout, resp.Body)
-	}else {
-		bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
-		bar.Start()
-		out, err := os.Create(selectedDump.Filename)
-		if err != nil {
-			return err
-		}
-		reader := bar.NewProxyReader(resp.Body)
-		io.Copy(out, reader)
-		bar.Update()
-	}
-
-	fmt.Println("")
-	if !inStdout {
-		fmt.Println("")
-		fmt.Print("File as been downloaded in ")
-		ct.Foreground(ct.Blue, false)
-		fmt.Print(selectedDump.Filename)
-		ct.ResetColor()
-		fmt.Println(" file")
-	}
-	return nil
+	return selectedDump, nil
 }
-func (this *DbDumperManager) List(showUrl bool) error {
-	serviceInstance, err := this.selectService("Which instance to list ?")
-	if err != nil {
-		return err
-	}
-	return this.ListFromInstanceName(serviceInstance, showUrl)
-}
-func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUrl bool) error {
 
-	dumps, err := this.getDumps(serviceInstance)
-	if err != nil {
-		return err
-	}
-	return this.ListFromInstanceNameWithDumps(serviceInstance, showUrl, dumps)
-}
-func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance string, showUrl bool, dumps []model.Dump) error {
-	fmt.Println("")
-	headers := []string{"#", "File Name", "Created At"}
-
-	if showUrl {
-		headers = append(headers, "Download Url")
-		headers = append(headers, "Dashboard Url")
-
-	}
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	for index, dump := range dumps {
-		var data []string
-		if showUrl {
-			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, dump.DownloadURL, dump.ShowURL}
-		}else {
-			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt}
-		}
-		table.Append(data)
-	}
-	table.Render()
-	return nil
-}
 func (this *DbDumperManager) cliCommand(command ...string) ([]string, error) {
 	if this.verbose {
 		return this.cliConnection.CliCommand(command...)
@@ -383,15 +435,7 @@ func (this *DbDumperManager) getDumps(serviceInstance string) ([]model.Dump, err
 	}
 	return credentials.Dumps, nil
 }
-func (this *DbDumperManager) DeleteDump() error {
-	serviceInstance, err := this.selectService("Which instance do you want to delete ? (dump will be really delete after a determined period) ?")
-	if err != nil {
-		return err
-	}
-	command := strings.Split(fmt.Sprintf(command_delete_dumps, serviceInstance), " ")
-	_, err = this.cliConnection.CliCommand(command...)
-	return err
-}
+
 func (this *DbDumperManager) getDbDumperServiceInstance() ([]string, error) {
 	services, err := this.cliConnection.GetServices()
 	if err != nil {
@@ -423,22 +467,7 @@ func (this *DbDumperManager) generateName(name string) (string, error) {
 	}
 	return prefix + name + service_name_suffix, nil
 }
-func (this *DbDumperManager) GetNamePrefix() (string, error) {
-	org, err := this.cliConnection.GetCurrentOrg()
-	if err != nil {
-		return "", err
-	}
-	space, err := this.cliConnection.GetCurrentSpace()
-	if err != nil {
-		return "", err
-	}
-	hash := md5.Sum([]byte(org.Name + "-" + space.Name + "-"))
-	md5String := hex.EncodeToString(hash[:])
-	return md5String[:8], nil
-}
-func (this *DbDumperManager) GetNameSuffix() (string, error) {
-	return service_name_suffix, nil
-}
+
 func (this *DbDumperManager) isUri(name string) bool {
 
 	_, err := url.ParseRequestURI(name)

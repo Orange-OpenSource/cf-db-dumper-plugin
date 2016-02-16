@@ -90,3 +90,17 @@ OPTIONS:
    --dump-number, -p 		Download from the number showed when using 'db-dumper list'
    --stdout, -o			Show file directly in stdout (service instance is no more optionnal and you need to use flag --dump-number or --recent)
 ```
+
+### Open
+
+```
+NAME:
+   db-dumper open - Open dump in your browser
+
+USAGE:
+   db-dumper open [command options] [service instance](optionnal)
+
+OPTIONS:
+   --recent		Open dump page from the most recent dump
+   --dump-number, -p 	Open from the number showed when using 'db-dumper list'
+```
