@@ -1,0 +1,25 @@
+language: go
+sudo: true
+go:
+- 1.5
+script:
+- bin/test
+after_success:
+- sudo apt-get update
+- sudo apt-get install php5
+- bin/build-all.sh
+- bin/generate_description.sh
+deploy:
+  provider: releases
+  api_key:
+    secure: EDHKUGsY9I8KpDpOT5HYJTXIanWOYRQXcQ/KJjGAobfaTB7yAdaSZeynWsblKN4wwy2aNxtdULbN41vrRC5X/PT47PQWOw5kBm9lYjN2VmKlSbRpuAWTLRSoZ6GP+RUVU8/Y7H1SGs0ocObBnRWS/dDMhTrpxBmxLTPI5e/V0KmBP7DotVIg/kvsug8gYltvpg6CRbhDHa3bU9MT4Fm/KHWSmUxZOWaIdJoQh75+kyQaXEYURrmS6eHA3rycptTfyi2OVEzb6LOxMF/bHDFVwUejPug9NXsCnyg8voJxjCc3oAq2E998iBLUo43V1qpQzY7CveJ+zxadfRvklT4XGG4M/Zp5Y0wT2nyLfLTgLKHLZhj05z7ohyysJgkdc1CYkiD7KKtsMio9huXEMH259cfh7MJffIqPaUofaxBpsJ1DZki3/FXgDNkz0Yqn6jd5/v9AJFlqfGGdkm/Jp4w7uX4ZYh32ljxZQjevm2B6Z9e9G7Rm807korJZkQX2j7IiNcS4AiQbLqq6gRZWgEzKnIS+LG1d7zJWcES8hbPMSODfdefeClx9YkzmP8Q6av2/nqxAkqlO2mDbvgK+JOUSE6og7eAF0pwOL+1w/KWchTf7nTn15HtjYb5iVndIvrrwtEBHXGF7qW/waGn3yGu8NVm5XKJudUqQmnhmjk5rfT4=
+  file:
+  - out/db-dumper_darwin_amd64
+  - out/db-dumper_linux_386
+  - out/db-dumper_linux_amd64
+  - out/db-dumper_windows_386.exe
+  - out/db-dumper_windows_amd64.exe
+  - repo-index.yml
+  on:
+    tags: true
+    all_branches: true

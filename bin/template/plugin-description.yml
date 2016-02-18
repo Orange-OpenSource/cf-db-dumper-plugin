@@ -4,7 +4,7 @@ plugins:
   version: 1.0.0
   created: %date%
   updated: %date_updated%
-  company:
+  company: Orange
   authors:
   - name: Arthur Halet
     homepage: https://github.com/ArthurHlt
