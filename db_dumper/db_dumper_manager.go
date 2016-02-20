@@ -20,6 +20,7 @@ import (
 	"io"
 	"github.com/cheggaaa/pb"
 	"github.com/skratchdot/open-golang/open"
+	"github.com/dustin/go-humanize"
 )
 type DbDumperManager struct {
 	cliConnection plugin.CliConnection
@@ -29,9 +30,9 @@ type DbDumperManager struct {
 var command_create_dump_nonexist = "cs %s %s %s -c"
 var command_create_dump_exist = "update-service %s -c"
 var command_restore_dump = "update-service %s -c"
-var json_restore = "{\"action\": \"restore\", \"target_url\": \"%s\", \"created_at\": \"%s\"}"
-var json_dump_nonexist = "{\"src_url\":\"%s\"}"
-var json_dump_exist = "{\"action\": \"dump\"}"
+var json_restore = "{\"action\": \"restore\", \"target_url\": \"%s\", \"created_at\": \"%s\", \"cf_user_token\": \"%s\", \"org\": \"%s\", \"space\": \"%s\"}"
+var json_dump_nonexist = "{\"src_url\":\"%s\", \"cf_user_token\": \"%s\", \"org\": \"%s\", \"space\": \"%s\"}"
+var json_dump_exist = "{\"action\": \"dump\", \"cf_user_token\": \"%s\", \"org\": \"%s\", \"space\": \"%s\"}"
 var command_delete_dumps = "ds %s"
 var service_name_suffix = "-dump"
 func NewDbDumperManager(serviceName string, cliConnection plugin.CliConnection, verbose bool) *DbDumperManager {
@@ -50,8 +51,12 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string) error {
 	}
 	if this.isServiceExist(name) {
 		command = strings.Split(fmt.Sprintf(command_create_dump_exist, this.serviceName), " ")
-		command = append(command, json_dump_exist)
-		_, err := this.cliConnection.CliCommand(command...)
+		commandJson, err := this.generateJsonFrom(json_dump_exist)
+		if err != nil {
+			return err
+		}
+		command = append(command, commandJson)
+		_, err = this.cliConnection.CliCommand(command...)
 		if err != nil {
 			return err
 		}
@@ -71,7 +76,11 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string) error {
 		return err
 	}
 	command = strings.Split(fmt.Sprintf(command_create_dump_nonexist, this.serviceName, plan, name), " ")
-	command = append(command, fmt.Sprintf(json_dump_nonexist, service_name_or_url))
+	commandJson, err := this.generateJsonFrom(json_dump_nonexist, service_name_or_url)
+	if err != nil {
+		return err
+	}
+	command = append(command, commandJson)
 	_, err = this.cliConnection.CliCommand(command...)
 	return err
 }
@@ -91,9 +100,13 @@ func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, rece
 			return err
 		}
 	}
-
+	this.cliConnection.AccessToken()
 	command := strings.Split(fmt.Sprintf(command_restore_dump, serviceInstance), " ")
-	command = append(command, fmt.Sprintf(json_restore, target_service_name_or_url, createdAt))
+	commandJson, err := this.generateJsonFrom(json_restore, target_service_name_or_url, createdAt)
+	if err != nil {
+		return err
+	}
+	command = append(command, commandJson)
 	_, err = this.cliConnection.CliCommand(command...)
 	return err
 }
@@ -197,7 +210,7 @@ func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUr
 }
 func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance string, showUrl bool, dumps []model.Dump) error {
 	fmt.Println("")
-	headers := []string{"#", "File Name", "Created At"}
+	headers := []string{"#", "File Name", "Created At", "Size", "Is Deleted ?"}
 
 	if showUrl {
 		headers = append(headers, "Download Url")
@@ -209,9 +222,9 @@ func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance strin
 	for index, dump := range dumps {
 		var data []string
 		if showUrl {
-			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, dump.DownloadURL, dump.ShowURL}
+			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, humanize.Bytes(dump.Size), strconv.FormatBool(dump.Deleted), dump.DownloadURL, dump.ShowURL}
 		}else {
-			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt}
+			data = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, humanize.Bytes(dump.Size), strconv.FormatBool(dump.Deleted)}
 		}
 		table.Append(data)
 	}
@@ -242,6 +255,25 @@ func (this *DbDumperManager) GetNamePrefix() (string, error) {
 }
 func (this *DbDumperManager) GetNameSuffix() (string, error) {
 	return service_name_suffix, nil
+}
+func (this *DbDumperManager) generateJsonFrom(template string, values ...interface{}) (string, error) {
+	token, err := this.cliConnection.AccessToken()
+	if err != nil {
+		return "", nil
+	}
+	if strings.HasPrefix(token, "bearer ") {
+		token = strings.TrimPrefix(token, "bearer ")
+	}
+	org, err := this.cliConnection.GetCurrentOrg()
+	if err != nil {
+		return "", nil
+	}
+	space, err := this.cliConnection.GetCurrentSpace()
+	if err != nil {
+		return "", nil
+	}
+	values = append(values, token, org.Name, space.Name)
+	return fmt.Sprintf(template, values...), nil
 }
 func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeList []string, defaultValueName, defaultValue string) (string, error) {
 	fmt.Println("Available " + typeToSelect + ":")
@@ -452,7 +484,7 @@ func (this *DbDumperManager) getDbDumperServiceInstance() ([]string, error) {
 }
 func (this *DbDumperManager) isServiceExist(name string) bool {
 	_, err := this.cliConnection.GetService(name)
-	return err != nil
+	return err == nil
 }
 func (this *DbDumperManager) generateName(name string) (string, error) {
 
