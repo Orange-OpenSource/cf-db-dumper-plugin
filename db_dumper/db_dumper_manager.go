@@ -21,6 +21,7 @@ import (
 	"github.com/cheggaaa/pb"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/dustin/go-humanize"
+	"github.com/cloudfoundry/cli/plugin/models"
 )
 type DbDumperManager struct {
 	cliConnection plugin.CliConnection
@@ -50,6 +51,7 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string) error {
 		return err
 	}
 	if this.isServiceExist(name) {
+		fmt.Println("what's going wrong ?")
 		command = strings.Split(fmt.Sprintf(command_create_dump_exist, this.serviceName), " ")
 		commandJson, err := this.generateJsonFrom(json_dump_exist)
 		if err != nil {
@@ -483,8 +485,11 @@ func (this *DbDumperManager) getDbDumperServiceInstance() ([]string, error) {
 	return dbDumperServices, nil
 }
 func (this *DbDumperManager) isServiceExist(name string) bool {
-	_, err := this.cliConnection.GetService(name)
-	return err == nil
+	service, err := this.cliConnection.GetService(name)
+	if (err != nil) {
+		return false
+	}
+	return service != (plugin_models.GetService_Model{})
 }
 func (this *DbDumperManager) generateName(name string) (string, error) {
 
