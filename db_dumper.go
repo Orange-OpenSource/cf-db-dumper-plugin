@@ -16,8 +16,9 @@ import (
 *
  */
 type BasicPlugin struct{}
+
 var version_major int = 1
-var version_minor int = 0
+var version_minor int = 1
 var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
@@ -27,6 +28,7 @@ var skipInsecure bool
 var inStdout bool
 var dumpNumber string
 var verboseMode bool
+
 func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 	// Ensure that we called the command basic-plugin-command
 	if args[0] != "db-dumper" {
@@ -123,7 +125,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						err = dbDumperManager.ListFromInstanceName(prefix + cg.Args().First() + suffix, showUrl)
 						checkError(err)
 					}
-				}else {
+				} else {
 					err := dbDumperManager.List(showUrl)
 					checkError(err)
 				}
@@ -169,7 +171,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						err = dbDumperManager.DownloadDumpFromInstanceName(prefix + cg.Args().First() + suffix, skipInsecure, recent, inStdout, dumpNumber)
 						checkError(err)
 					}
-				}else {
+				} else {
 					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, dumpNumber)
 					checkError(err)
 				}
@@ -205,7 +207,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						err = dbDumperManager.ShowDumpFromInstanceName(prefix + cg.Args().First() + suffix, recent, dumpNumber)
 						checkError(err)
 					}
-				}else {
+				} else {
 					err := dbDumperManager.ShowDump(recent, dumpNumber)
 					checkError(err)
 				}
