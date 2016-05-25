@@ -28,6 +28,7 @@ var showUrl bool
 var recent bool
 var original bool
 var skipInsecure bool
+var force bool
 var inStdout bool
 var dumpNumber string
 var verboseMode bool
@@ -118,20 +119,27 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
 			Aliases:     []string{"d"},
 			Usage:     "Delete a instance and all its dumps (dumps can be retrieve during a period)",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name: "force, f",
+					Usage: "Force deletion without confirmation",
+					Destination: &force,
+				},
+			},
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 				if len(cg.Args()) > 0 {
 					prefix, err := dbDumperManager.GetNamePrefix()
 					checkError(err)
 					suffix, _ := dbDumperManager.GetNameSuffix()
-					err = dbDumperManager.DeleteDump(prefix + cg.Args().First() + suffix)
+					err = dbDumperManager.DeleteDump(prefix + cg.Args().First() + suffix, force)
 					if err != nil {
 						warning("Trying on a non generated service", err)
-						err = dbDumperManager.DeleteDump(cg.Args().First())
+						err = dbDumperManager.DeleteDump(cg.Args().First(), force)
 						checkError(err)
 					}
 				} else {
-					err := dbDumperManager.DeleteDump("")
+					err := dbDumperManager.DeleteDump("", force)
 					checkError(err)
 				}
 

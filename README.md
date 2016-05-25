@@ -64,7 +64,10 @@ NAME:
    db-dumper delete - Delete a instance and all its dumps (dumps can be retrieve during a period)
 
 USAGE:
-   db-dumper delete [service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)
+   db-dumper delete [command options] [service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)
+
+OPTIONS:
+   --force, -f	Force deletion without confirmation
 ```
 
 ### List

@@ -301,7 +301,7 @@ func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance strin
 	table.Render()
 	return nil
 }
-func (this *DbDumperManager) DeleteDump(serviceInstance string) error {
+func (this *DbDumperManager) DeleteDump(serviceInstance string, force bool) error {
 	var err error
 	if serviceInstance == "" {
 		serviceInstance, err = this.selectService("Which instance do you want to delete ? (dump will be really delete after a determined period)")
@@ -316,6 +316,9 @@ func (this *DbDumperManager) DeleteDump(serviceInstance string) error {
 	}
 
 	command := strings.Split(fmt.Sprintf(command_delete_dumps, serviceInstance), " ")
+	if (force) {
+		command = append(command, "-f")
+	}
 	_, err = this.cliConnection.CliCommand(command...)
 	return err
 }
