@@ -24,6 +24,7 @@ var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
 var showUrl bool
 var recent bool
+var original bool
 var skipInsecure bool
 var inStdout bool
 var dumpNumber string
@@ -117,12 +118,13 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 
 				if len(cg.Args()) > 0 {
-					err := dbDumperManager.ListFromInstanceName(cg.Args().First(), showUrl)
+					prefix, err := dbDumperManager.GetNamePrefix()
+					checkError(err)
+					suffix, _ := dbDumperManager.GetNameSuffix()
+					err = dbDumperManager.ListFromInstanceName(prefix + cg.Args().First() + suffix, showUrl)
 					if err != nil {
-						prefix, err := dbDumperManager.GetNamePrefix()
-						checkError(err)
-						suffix, _ := dbDumperManager.GetNameSuffix()
-						err = dbDumperManager.ListFromInstanceName(prefix + cg.Args().First() + suffix, showUrl)
+						warning("Trying on a non generated service", err)
+						err = dbDumperManager.ListFromInstanceName(cg.Args().First(), showUrl)
 						checkError(err)
 					}
 				} else {
@@ -148,6 +150,11 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Usage: "Download from the most recent dump",
 					Destination: &recent,
 				},
+				cli.BoolFlag{
+					Name: "original",
+					Usage: "Download the original file (e.g.: download directly sql file instead of compressed file)",
+					Destination: &original,
+				},
 				cli.StringFlag{
 					Name: "dump-number, p",
 					Usage: "Download from the number showed when using 'db-dumper list'",
@@ -163,16 +170,17 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 				if len(cg.Args()) > 0 {
-					err := dbDumperManager.DownloadDumpFromInstanceName(cg.Args().First(), skipInsecure, recent, inStdout, dumpNumber)
+					prefix, err := dbDumperManager.GetNamePrefix()
+					checkError(err)
+					suffix, _ := dbDumperManager.GetNameSuffix()
+					err = dbDumperManager.DownloadDumpFromInstanceName(prefix + cg.Args().First() + suffix, skipInsecure, recent, inStdout, original, dumpNumber)
 					if err != nil {
-						prefix, err := dbDumperManager.GetNamePrefix()
-						checkError(err)
-						suffix, _ := dbDumperManager.GetNameSuffix()
-						err = dbDumperManager.DownloadDumpFromInstanceName(prefix + cg.Args().First() + suffix, skipInsecure, recent, inStdout, dumpNumber)
+						warning("Trying on a non generated service", err)
+						err = dbDumperManager.DownloadDumpFromInstanceName(cg.Args().First(), skipInsecure, recent, inStdout, original, dumpNumber)
 						checkError(err)
 					}
 				} else {
-					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, dumpNumber)
+					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber)
 					checkError(err)
 				}
 
@@ -199,12 +207,13 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 				if len(cg.Args()) > 0 {
-					err := dbDumperManager.ShowDumpFromInstanceName(cg.Args().First(), recent, dumpNumber)
+					prefix, err := dbDumperManager.GetNamePrefix()
+					checkError(err)
+					suffix, _ := dbDumperManager.GetNameSuffix()
+					err = dbDumperManager.ShowDumpFromInstanceName(prefix + cg.Args().First() + suffix, recent, dumpNumber)
 					if err != nil {
-						prefix, err := dbDumperManager.GetNamePrefix()
-						checkError(err)
-						suffix, _ := dbDumperManager.GetNameSuffix()
-						err = dbDumperManager.ShowDumpFromInstanceName(prefix + cg.Args().First() + suffix, recent, dumpNumber)
+						warning("Trying on a non generated service", err)
+						err = dbDumperManager.ShowDumpFromInstanceName(cg.Args().First(), recent, dumpNumber)
 						checkError(err)
 					}
 				} else {
@@ -245,18 +254,25 @@ func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 		},
 	}
 }
+func warning(message string, err error) {
+	fmt.Print("Warning: ")
+	ct.Foreground(ct.Yellow, false)
+	fmt.Println(fmt.Sprintf("%v", err))
+	fmt.Println(message)
+	ct.ResetColor()
+}
 func checkError(err error) {
-	if err != nil {
-		fmt.Print("error: ")
-		ct.Foreground(ct.Red, false)
-		fmt.Println(fmt.Sprintf("%v", err))
-		ct.ResetColor()
-		if verboseMode == false {
-			fmt.Println("Tip: use --verbose to see what's going wrong with cf core command")
-		}
-		os.Exit(1)
-
+	if err == nil {
+		return
 	}
+	fmt.Print("Error: ")
+	ct.Foreground(ct.Red, false)
+	fmt.Println(fmt.Sprintf("%v", err))
+	ct.ResetColor()
+	if verboseMode == false {
+		fmt.Println("Tip: use --verbose to see what's going wrong with cf core command")
+	}
+	os.Exit(1)
 }
 func main() {
 	plugin.Start(new(BasicPlugin))

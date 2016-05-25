@@ -128,6 +128,9 @@ func (this *DbDumperManager) selectDump(serviceInstance string, recent bool, dum
 	if err != nil {
 		return model.Dump{}, err
 	}
+	if len(dumps) == 0 {
+		return model.Dump{}, errors.New("There is no dumps available")
+	}
 	createdAt := dumpDateOrNumber
 	if index, err := strconv.Atoi(dumpDateOrNumber); err == nil {
 		if index < len(dumps) && index >= 0 {

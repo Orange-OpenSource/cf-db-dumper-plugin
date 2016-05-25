@@ -21,6 +21,7 @@ import (
 	"github.com/skratchdot/open-golang/open"
 	"github.com/dustin/go-humanize"
 	"github.com/cloudfoundry/cli/plugin/models"
+	"mime"
 )
 
 type DbDumperManager struct {
@@ -125,7 +126,7 @@ func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, rece
 	}
 	return this.waitServiceAction(serviceInstance, "Restoring dump")
 }
-func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdout bool, dumpDateOrNumber string) error {
+func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdout bool, original bool, dumpDateOrNumber string) error {
 	if inStdout {
 		return errors.New("To use stdout option you need to pass a service instance.")
 	}
@@ -133,9 +134,9 @@ func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdo
 	if err != nil {
 		return err
 	}
-	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, dumpDateOrNumber)
+	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, original, dumpDateOrNumber)
 }
-func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, dumpDateOrNumber string) error {
+func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, original bool, dumpDateOrNumber string) error {
 
 	if inStdout && dumpDateOrNumber == "" && !recent {
 		return errors.New("stdout option can only be use with flag --dump-number or --recent")
@@ -158,37 +159,69 @@ func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string
 		Transport: transport,
 	}
 
-	resp, err := client.Get(selectedDump.DownloadURL)
+	downloadUrl := selectedDump.DownloadURL
+	if (original) {
+		downloadUrl += "?original=1"
+	}
+	resp, err := client.Get(downloadUrl)
 	if err != nil {
 		return err
+	}
+
+	fileName, err := getFileNameFromHttpResponse(resp)
+	if err != nil {
+		return err
+	}
+	if fileName == "" {
+		fileName = selectedDump.Filename
 	}
 	if resp.StatusCode != 200 {
 		return errors.New("Dump can't be downloaded, http status code: " + strconv.Itoa(resp.StatusCode))
 	}
 	fmt.Println("")
-	if inStdout {
-		io.Copy(os.Stdout, resp.Body)
-	} else {
-		bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
-		bar.Start()
-		out, err := os.Create(selectedDump.Filename)
-		if err != nil {
-			return err
-		}
-		reader := bar.NewProxyReader(resp.Body)
-		io.Copy(out, reader)
-		bar.Update()
-	}
 
+	err = downloadFile(resp, fileName, inStdout)
+	if err != nil {
+		return err
+	}
 	fmt.Println("")
 	if !inStdout {
 		fmt.Println("")
 		fmt.Print("File as been downloaded in ")
 		ct.Foreground(ct.Blue, false)
-		fmt.Print(selectedDump.Filename)
+		fmt.Print(fileName)
 		ct.ResetColor()
 		fmt.Println(" file")
 	}
+	return nil
+}
+func getFileNameFromHttpResponse(resp *http.Response) (string, error) {
+	_, dispositionParams, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	if err != nil {
+		return "", err
+	}
+	fileName := dispositionParams["filename"]
+	fileName = strings.Replace(fileName, "/", "_", -1)
+	return dispositionParams["filename"], nil
+}
+func downloadFile(resp *http.Response, fileName string, inStdout bool) error {
+	if inStdout {
+		io.Copy(os.Stdout, resp.Body)
+		return nil
+	}
+	out, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	if resp.ContentLength != -1 {
+		bar := pb.New(int(resp.ContentLength)).SetUnits(pb.U_BYTES)
+		bar.Start()
+		reader := bar.NewProxyReader(resp.Body)
+		io.Copy(out, reader)
+		bar.Update()
+		return nil
+	}
+	io.Copy(out, resp.Body)
 	return nil
 }
 func (this *DbDumperManager) ShowDump(recent bool, dumpDateOrNumber string) error {
@@ -220,6 +253,9 @@ func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUr
 	dumps, err := this.getDumps(serviceInstance)
 	if err != nil {
 		return err
+	}
+	if len(dumps) == 0 {
+		return errors.New("There is no dumps available")
 	}
 	return this.ListFromInstanceNameWithDumps(serviceInstance, showUrl, dumps)
 }

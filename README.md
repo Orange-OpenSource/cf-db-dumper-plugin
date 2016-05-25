@@ -12,7 +12,7 @@ USAGE:
    db-dumper [global options] command [command options] [arguments...]
 
 VERSION:
-   1.0.0
+   1.1.0
 
 COMMANDS:
    create, c	Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
@@ -87,6 +87,7 @@ USAGE:
 OPTIONS:
    --skip-ssl-validation, -k	Skip the ssl validation (for self-signed certificate mainly)
    --recent			Download from the most recent dump
+   --original			Download the original file (e.g.: download directly sql file instead of compressed file)
    --dump-number, -p 		Download from the number showed when using 'db-dumper list'
    --stdout, -o			Show file directly in stdout (service instance is no more optionnal and you need to use flag --dump-number or --recent)
 ```
