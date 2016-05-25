@@ -28,11 +28,10 @@ func (this *DbDumperManager) waitServiceAction(serviceName string, action string
 		switch (state) {
 		case "succeeded":
 			fmt.Println(action + " finished.")
-			return nil;
+			return nil
 		case "in progress":
-			break;
-		case "failed":
-		case "internal error":
+			break
+		case "failed", "internal error":
 			return errors.New(service.LastOperation.Description);
 		}
 		ipb.Next()
