@@ -123,6 +123,20 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 	}
 	return serviceInstance, nil
 }
+func (this *DbDumperManager) selectPlan() (string, error) {
+	fmt.Println("Searching available plans...")
+	fmt.Println("")
+	plans, err := this.getPlanFromService()
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("")
+	plan, err := this.selectByUser("plans", "Which plans do you want ? ", plans, plans[0], plans[0])
+	if err != nil {
+		return "", err
+	}
+	return plan, nil
+}
 func (this *DbDumperManager) selectDump(serviceInstance string, recent bool, dumpDateOrNumber string) (model.Dump, error) {
 	dumps, err := this.getDumps(serviceInstance)
 	if err != nil {

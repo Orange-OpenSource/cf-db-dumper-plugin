@@ -153,7 +153,19 @@ func (this *DbDumperManager) getDumps(serviceInstance string) ([]model.Dump, err
 	}
 	return credentials.Dumps, nil
 }
-
+func (this *DbDumperManager) isDbDumperInstance(instance string) bool {
+	service, err := this.cliConnection.GetService(instance)
+	if err != nil {
+		return false
+	}
+	return service.ServiceOffering.Name == this.serviceName
+}
+func (this *DbDumperManager) checkIsDbDumperInstance(instance string) error {
+	if (!this.isDbDumperInstance(instance)) {
+		return errors.New("Instance " + instance + " is not an instance of db-dumper-service")
+	}
+	return nil
+}
 func (this *DbDumperManager) generateJsonFrom(template string, values ...interface{}) (string, error) {
 	token, err := this.cliConnection.AccessToken()
 	if err != nil {

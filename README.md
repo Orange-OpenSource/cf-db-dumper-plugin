@@ -36,7 +36,10 @@ NAME:
    db-dumper create - Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
 
 USAGE:
-   db-dumper create [service-name-or-url-of-your-db]
+   db-dumper create [command options] [service-name-or-url-of-your-db]
+
+OPTIONS:
+   --plan 	Choose the plan to use. If not set it will ask you to choose one from a list
 ```
 
 ### Restore
@@ -56,10 +59,10 @@ OPTIONS:
 
 ```
 NAME:
-   db-dumper delete - Delete a instance and all his dumps (dumps can be retrieve during a period)
+   db-dumper delete - Delete a instance and all its dumps (dumps can be retrieve during a period)
 
 USAGE:
-   db-dumper delete [arguments...]
+   db-dumper delete [service instance](optionnal)
 ```
 
 ### List

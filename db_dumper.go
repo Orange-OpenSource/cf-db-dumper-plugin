@@ -22,6 +22,7 @@ var version_minor int = 1
 var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
+var plan string
 var showUrl bool
 var recent bool
 var original bool
@@ -62,12 +63,19 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 
 			Usage:     "Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
 			ArgsUsage: "[service-name-or-url-of-your-db]",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name: "plan",
+					Usage: "Choose the plan to use. If not set it will ask you to choose one from a list",
+					Destination: &plan,
+				},
+			},
 			Action: func(cg *cli.Context) {
 				if len(cg.Args()) == 0 {
 					checkError(errors.New("you must provide a service name or an url to a database"))
 				}
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				err := dbDumperManager.CreateDump(cg.Args().First())
+				err := dbDumperManager.CreateDump(cg.Args().First(), plan)
 				checkError(err)
 			},
 		},
@@ -94,12 +102,26 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 		},
 		{
 			Name:      "delete",
+			ArgsUsage: "[service instance](optionnal)",
 			Aliases:     []string{"d"},
-			Usage:     "Delete a instance and all his dumps (dumps can be retrieve during a period)",
+			Usage:     "Delete a instance and all its dumps (dumps can be retrieve during a period)",
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				err := dbDumperManager.DeleteDump()
-				checkError(err)
+				if len(cg.Args()) > 0 {
+					prefix, err := dbDumperManager.GetNamePrefix()
+					checkError(err)
+					suffix, _ := dbDumperManager.GetNameSuffix()
+					err = dbDumperManager.DeleteDump(prefix + cg.Args().First() + suffix)
+					if err != nil {
+						warning("Trying on a non generated service", err)
+						err = dbDumperManager.DeleteDump(cg.Args().First())
+						checkError(err)
+					}
+				} else {
+					err := dbDumperManager.DeleteDump("")
+					checkError(err)
+				}
+
 			},
 		},
 		{

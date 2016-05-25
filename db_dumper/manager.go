@@ -49,7 +49,7 @@ func NewDbDumperManager(serviceName string, cliConnection plugin.CliConnection, 
 	}
 }
 
-func (this *DbDumperManager) CreateDump(service_name_or_url string) error {
+func (this *DbDumperManager) CreateDump(service_name_or_url string, plan string) error {
 	name, err := this.generateName(service_name_or_url)
 	var command []string
 	if err != nil {
@@ -72,18 +72,13 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string) error {
 		}
 		return nil
 	}
-	fmt.Println("Service for this database doesn't exist, create it...")
+	fmt.Println("Service for this database doesn't exist, creating it...")
 	fmt.Println("")
-	fmt.Println("Searching available plans...")
-	fmt.Println("")
-	plans, err := this.getPlanFromService()
-	if err != nil {
-		return err
-	}
-	fmt.Println("")
-	plan, err := this.selectByUser("plans", "Which plans do you want ? ", plans, plans[0], plans[0])
-	if err != nil {
-		return err
+	if plan == "" {
+		plan, err = this.selectPlan()
+		if err != nil {
+			return err
+		}
 	}
 	command = strings.Split(fmt.Sprintf(command_create_dump_nonexist, this.serviceName, plan, name), " ")
 	commandJson, err := this.generateJsonFrom(json_dump_nonexist, service_name_or_url)
@@ -137,7 +132,10 @@ func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdo
 	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, original, dumpDateOrNumber)
 }
 func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, original bool, dumpDateOrNumber string) error {
-
+	err := this.checkIsDbDumperInstance(serviceInstance)
+	if err != nil {
+		return err
+	}
 	if inStdout && dumpDateOrNumber == "" && !recent {
 		return errors.New("stdout option can only be use with flag --dump-number or --recent")
 	}
@@ -232,6 +230,10 @@ func (this *DbDumperManager) ShowDump(recent bool, dumpDateOrNumber string) erro
 	return this.ShowDumpFromInstanceName(serviceInstance, recent, dumpDateOrNumber)
 }
 func (this *DbDumperManager) ShowDumpFromInstanceName(serviceInstance string, recent bool, dumpDateOrNumber string) error {
+	err := this.checkIsDbDumperInstance(serviceInstance)
+	if err != nil {
+		return err
+	}
 	selectedDump, err := this.selectDump(serviceInstance, recent, dumpDateOrNumber)
 	if err != nil {
 		return err
@@ -249,7 +251,10 @@ func (this *DbDumperManager) List(showUrl bool) error {
 	return this.ListFromInstanceName(serviceInstance, showUrl)
 }
 func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUrl bool) error {
-
+	err := this.checkIsDbDumperInstance(serviceInstance)
+	if err != nil {
+		return err
+	}
 	dumps, err := this.getDumps(serviceInstance)
 	if err != nil {
 		return err
@@ -260,6 +265,10 @@ func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUr
 	return this.ListFromInstanceNameWithDumps(serviceInstance, showUrl, dumps)
 }
 func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance string, showUrl bool, dumps []model.Dump) error {
+	err := this.checkIsDbDumperInstance(serviceInstance)
+	if err != nil {
+		return err
+	}
 	fmt.Println("")
 	headers := []string{"#", "File Name", "Created At", "Size", "Is Deleted ?"}
 
@@ -282,11 +291,20 @@ func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance strin
 	table.Render()
 	return nil
 }
-func (this *DbDumperManager) DeleteDump() error {
-	serviceInstance, err := this.selectService("Which instance do you want to delete ? (dump will be really delete after a determined period)")
-	if err != nil {
-		return err
+func (this *DbDumperManager) DeleteDump(serviceInstance string) error {
+	var err error
+	if serviceInstance == "" {
+		serviceInstance, err = this.selectService("Which instance do you want to delete ? (dump will be really delete after a determined period)")
+		if err != nil {
+			return err
+		}
+	} else {
+		err = this.checkIsDbDumperInstance(serviceInstance)
+		if err != nil {
+			return err
+		}
 	}
+
 	command := strings.Split(fmt.Sprintf(command_delete_dumps, serviceInstance), " ")
 	_, err = this.cliConnection.CliCommand(command...)
 	return err
