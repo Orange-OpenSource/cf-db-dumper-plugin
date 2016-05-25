@@ -22,6 +22,7 @@ var version_minor int = 1
 var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
+var sourceInstance string
 var plan string
 var showUrl bool
 var recent bool
@@ -61,7 +62,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Name:      "create",
 			Aliases:     []string{"c"},
 
-			Usage:     "Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
+			Usage:     "Create a dump from a database service (e.g.: mydb) or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
 			ArgsUsage: "[service-name-or-url-of-your-db]",
 			Flags: []cli.Flag{
 				cli.StringFlag{
@@ -88,6 +89,11 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Usage: "Restore from the most recent dump",
 					Destination: &recent,
 				},
+				cli.StringFlag{
+					Name: "source-instance",
+					Usage: "The db dumper service instance where dumps should be retrieved (this can be the service instance you passed in create e.g.: mydb)",
+					Destination: &sourceInstance,
+				},
 			},
 			Usage:     "Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
 			ArgsUsage: "[service-name-or-url-of-your-db]",
@@ -96,13 +102,20 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					checkError(errors.New("you must provide a service name or an url to a target database"))
 				}
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				err := dbDumperManager.RestoreDump(cg.Args().First(), recent)
+				prefix, err := dbDumperManager.GetNamePrefix()
 				checkError(err)
+				suffix, _ := dbDumperManager.GetNameSuffix()
+				err = dbDumperManager.RestoreDump(cg.Args().First(), recent, prefix + sourceInstance + suffix)
+				if err != nil {
+					warning("Trying on a non generated service", err)
+					err = dbDumperManager.RestoreDump(cg.Args().First(), recent, sourceInstance)
+					checkError(err)
+				}
 			},
 		},
 		{
 			Name:      "delete",
-			ArgsUsage: "[service instance](optionnal)",
+			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
 			Aliases:     []string{"d"},
 			Usage:     "Delete a instance and all its dumps (dumps can be retrieve during a period)",
 			Action: func(cg *cli.Context) {
@@ -128,7 +141,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Name:      "list",
 			Aliases:     []string{"l"},
 			Usage:     "List dumps for an instance",
-			ArgsUsage: "[service instance](optionnal)",
+			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name: "show-url, s",
@@ -160,7 +173,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Name:      "download",
 			Aliases:     []string{"dl"},
 			Usage:     "Download a dump to your drive",
-			ArgsUsage: "[service instance](optionnal)",
+			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name: "skip-ssl-validation, k",
@@ -212,7 +225,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Name:      "open",
 			Aliases:  []string{"o"},
 			Usage:     "Open dump in your browser",
-			ArgsUsage: "[service instance](optionnal)",
+			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name: "recent",

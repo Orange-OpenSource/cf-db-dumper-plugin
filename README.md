@@ -15,11 +15,12 @@ VERSION:
    1.1.0
 
 COMMANDS:
-   create, c	Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
+   create, c	Create a dump from a database service (e.g.: mydb) or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
    restore, r	Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
-   delete, d	Delete a instance and all his dumps (dumps can be retrieve during a period)
+   delete, d	Delete a instance and all its dumps (dumps can be retrieve during a period)
    list, l	List dumps for an instance
    download, dl	Download a dump to your drive
+   open, o	Open dump in your browser
    help, h	Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
@@ -33,7 +34,7 @@ GLOBAL OPTIONS:
 
 ```
 NAME:
-   db-dumper create - Create a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
+   db-dumper create - Create a dump from a database service (e.g.: mydb) or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
 
 USAGE:
    db-dumper create [command options] [service-name-or-url-of-your-db]
@@ -52,7 +53,8 @@ USAGE:
    db-dumper restore [command options] [service-name-or-url-of-your-db]
 
 OPTIONS:
-   --recent	Restore from the most recent dump
+   --recent		Restore from the most recent dump
+   --source-instance 	The db dumper service instance where dumps should be retrieved (this can be the service instance you passed in create e.g.: mydb)
 ```
 
 ### Delete
@@ -62,7 +64,7 @@ NAME:
    db-dumper delete - Delete a instance and all its dumps (dumps can be retrieve during a period)
 
 USAGE:
-   db-dumper delete [service instance](optionnal)
+   db-dumper delete [service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)
 ```
 
 ### List
@@ -72,7 +74,7 @@ NAME:
    db-dumper list - List dumps for an instance
 
 USAGE:
-   db-dumper list [command options] [service instance](optionnal)
+   db-dumper list [command options] [service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)
 
 OPTIONS:
    --show-url, -s	If you want to see download url and dashboard url
@@ -85,7 +87,7 @@ NAME:
    db-dumper download - Download a dump to your drive
 
 USAGE:
-   db-dumper download [command options] [service instance](optionnal)
+   db-dumper download [command options] [service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)
 
 OPTIONS:
    --skip-ssl-validation, -k	Skip the ssl validation (for self-signed certificate mainly)
@@ -102,7 +104,7 @@ NAME:
    db-dumper open - Open dump in your browser
 
 USAGE:
-   db-dumper open [command options] [service instance](optionnal)
+   db-dumper open [command options] [service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)
 
 OPTIONS:
    --recent		Open dump page from the most recent dump

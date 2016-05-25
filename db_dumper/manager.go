@@ -92,10 +92,20 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string, plan string)
 	}
 	return this.waitServiceAction(name, "Creating dump")
 }
-func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, recent bool) error {
-	serviceInstance, err := this.selectService("Which instance do you want to restore to '" + target_service_name_or_url + "' ?")
-	if err != nil {
-		return err
+func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, recent bool, sourceInstance string) error {
+	var serviceInstance string
+	var err error
+	if sourceInstance != "" {
+		err = this.checkIsDbDumperInstance(sourceInstance)
+		if err != nil {
+			return err
+		}
+		serviceInstance = sourceInstance
+	} else {
+		serviceInstance, err = this.selectService("Which instance do you want to restore to '" + target_service_name_or_url + "' ?")
+		if err != nil {
+			return err
+		}
 	}
 	createdAt := ""
 	if recent == false {
