@@ -31,9 +31,11 @@ func (this *DbDumperManager) waitServiceAction(serviceName string, action string
 			return nil
 		case "in progress":
 			break
-		case "failed", "internal error":
+		default:
 			return errors.New(service.LastOperation.Description);
+
 		}
+
 		ipb.Next()
 	}
 	return nil;
