@@ -147,12 +147,16 @@ func (this *DbDumperManager) getDumps(serviceInstance string) ([]model.Dump, err
 	if err != nil {
 		return nil, err
 	}
-	command = []string{"delete-service-key", serviceInstance, "plugin-key-" + serviceInstance, "-f"}
-	_, err = this.cliCommand(command...)
+	err = this.deleteServiceKey(serviceInstance)
 	if err != nil {
 		return nil, err
 	}
 	return credentials.Dumps, nil
+}
+func (this *DbDumperManager) deleteServiceKey(serviceInstance string) error {
+	command := []string{"delete-service-key", serviceInstance, "plugin-key-" + serviceInstance, "-f"}
+	_, err := this.cliCommand(command...)
+	return err
 }
 func (this *DbDumperManager) isDbDumperInstance(instance string) bool {
 	service, err := this.cliConnection.GetService(instance)

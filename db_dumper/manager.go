@@ -290,7 +290,7 @@ func (this *DbDumperManager) DeleteDump(serviceInstance string, force bool) erro
 			return err
 		}
 	}
-
+	this.deleteServiceKey(serviceInstance)
 	command := strings.Split(fmt.Sprintf(command_delete_dumps, serviceInstance), " ")
 	if (force) {
 		command = append(command, "-f")
