@@ -19,7 +19,7 @@ type BasicPlugin struct{}
 
 var version_major int = 1
 var version_minor int = 1
-var version_build int = 0
+var version_build int = 1
 var helpText string = "Help you to manipulate db-dumper service"
 var serviceName string
 var sourceInstance string
@@ -106,12 +106,15 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 				prefix, err := dbDumperManager.GetNamePrefix()
 				checkError(err)
 				suffix, _ := dbDumperManager.GetNameSuffix()
-				err = dbDumperManager.RestoreDump(cg.Args().First(), recent, prefix + sourceInstance + suffix)
+				instanceName := prefix + sourceInstance + suffix
+				err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 				if err != nil {
-					warning("Trying on a non generated service", err)
-					err = dbDumperManager.RestoreDump(cg.Args().First(), recent, sourceInstance)
+					instanceName = sourceInstance
+					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					checkError(err)
 				}
+				err = dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName)
+				checkError(err)
 			},
 		},
 		{
@@ -132,12 +135,15 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					prefix, err := dbDumperManager.GetNamePrefix()
 					checkError(err)
 					suffix, _ := dbDumperManager.GetNameSuffix()
-					err = dbDumperManager.DeleteDump(prefix + cg.Args().First() + suffix, force)
+					instanceName := prefix + cg.Args().First() + suffix
+					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					if err != nil {
-						warning("Trying on a non generated service", err)
-						err = dbDumperManager.DeleteDump(cg.Args().First(), force)
+						instanceName = cg.Args().First()
+						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
+					err = dbDumperManager.DeleteDump(instanceName, force)
+					checkError(err)
 				} else {
 					err := dbDumperManager.DeleteDump("", force)
 					checkError(err)
@@ -164,12 +170,15 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					prefix, err := dbDumperManager.GetNamePrefix()
 					checkError(err)
 					suffix, _ := dbDumperManager.GetNameSuffix()
-					err = dbDumperManager.ListFromInstanceName(prefix + cg.Args().First() + suffix, showUrl)
+					instanceName := prefix + cg.Args().First() + suffix
+					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					if err != nil {
-						warning("Trying on a non generated service", err)
-						err = dbDumperManager.ListFromInstanceName(cg.Args().First(), showUrl)
+						instanceName = cg.Args().First()
+						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
+					err = dbDumperManager.ListFromInstanceName(instanceName, showUrl)
+					checkError(err)
 				} else {
 					err := dbDumperManager.List(showUrl)
 					checkError(err)
@@ -216,12 +225,15 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					prefix, err := dbDumperManager.GetNamePrefix()
 					checkError(err)
 					suffix, _ := dbDumperManager.GetNameSuffix()
-					err = dbDumperManager.DownloadDumpFromInstanceName(prefix + cg.Args().First() + suffix, skipInsecure, recent, inStdout, original, dumpNumber)
+					instanceName := prefix + cg.Args().First() + suffix
+					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					if err != nil {
-						warning("Trying on a non generated service", err)
-						err = dbDumperManager.DownloadDumpFromInstanceName(cg.Args().First(), skipInsecure, recent, inStdout, original, dumpNumber)
+						instanceName = cg.Args().First()
+						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
+					err = dbDumperManager.DownloadDumpFromInstanceName(instanceName, skipInsecure, recent, inStdout, original, dumpNumber)
+					checkError(err)
 				} else {
 					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber)
 					checkError(err)
@@ -253,12 +265,16 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					prefix, err := dbDumperManager.GetNamePrefix()
 					checkError(err)
 					suffix, _ := dbDumperManager.GetNameSuffix()
-					err = dbDumperManager.ShowDumpFromInstanceName(prefix + cg.Args().First() + suffix, recent, dumpNumber)
+					instanceName := prefix + cg.Args().First() + suffix
+					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					if err != nil {
-						warning("Trying on a non generated service", err)
-						err = dbDumperManager.ShowDumpFromInstanceName(cg.Args().First(), recent, dumpNumber)
+						instanceName = cg.Args().First()
+						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
+					err = dbDumperManager.ShowDumpFromInstanceName(instanceName, recent, dumpNumber)
+					checkError(err)
+
 				} else {
 					err := dbDumperManager.ShowDump(recent, dumpNumber)
 					checkError(err)

@@ -56,7 +56,7 @@ func (this *DbDumperManager) CreateDump(service_name_or_url string, plan string)
 		return err
 	}
 	if this.isServiceExist(name) {
-		command = strings.Split(fmt.Sprintf(command_create_dump_exist, this.serviceName), " ")
+		command = strings.Split(fmt.Sprintf(command_create_dump_exist, name), " ")
 		commandJson, err := this.generateJsonFrom(json_dump_exist)
 		if err != nil {
 			return err
@@ -96,10 +96,6 @@ func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, rece
 	var serviceInstance string
 	var err error
 	if sourceInstance != "" {
-		err = this.checkIsDbDumperInstance(sourceInstance)
-		if err != nil {
-			return err
-		}
 		serviceInstance = sourceInstance
 	} else {
 		serviceInstance, err = this.selectService("Which instance do you want to restore to '" + target_service_name_or_url + "' ?")
@@ -142,10 +138,6 @@ func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdo
 	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, original, dumpDateOrNumber)
 }
 func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, original bool, dumpDateOrNumber string) error {
-	err := this.checkIsDbDumperInstance(serviceInstance)
-	if err != nil {
-		return err
-	}
 	if inStdout && dumpDateOrNumber == "" && !recent {
 		return errors.New("stdout option can only be use with flag --dump-number or --recent")
 	}
@@ -240,10 +232,6 @@ func (this *DbDumperManager) ShowDump(recent bool, dumpDateOrNumber string) erro
 	return this.ShowDumpFromInstanceName(serviceInstance, recent, dumpDateOrNumber)
 }
 func (this *DbDumperManager) ShowDumpFromInstanceName(serviceInstance string, recent bool, dumpDateOrNumber string) error {
-	err := this.checkIsDbDumperInstance(serviceInstance)
-	if err != nil {
-		return err
-	}
 	selectedDump, err := this.selectDump(serviceInstance, recent, dumpDateOrNumber)
 	if err != nil {
 		return err
@@ -261,10 +249,7 @@ func (this *DbDumperManager) List(showUrl bool) error {
 	return this.ListFromInstanceName(serviceInstance, showUrl)
 }
 func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUrl bool) error {
-	err := this.checkIsDbDumperInstance(serviceInstance)
-	if err != nil {
-		return err
-	}
+
 	dumps, err := this.getDumps(serviceInstance)
 	if err != nil {
 		return err
@@ -275,10 +260,6 @@ func (this *DbDumperManager) ListFromInstanceName(serviceInstance string, showUr
 	return this.ListFromInstanceNameWithDumps(serviceInstance, showUrl, dumps)
 }
 func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance string, showUrl bool, dumps []model.Dump) error {
-	err := this.checkIsDbDumperInstance(serviceInstance)
-	if err != nil {
-		return err
-	}
 	fmt.Println("")
 	headers := []string{"#", "File Name", "Created At", "Size", "Is Deleted ?"}
 
@@ -305,11 +286,6 @@ func (this *DbDumperManager) DeleteDump(serviceInstance string, force bool) erro
 	var err error
 	if serviceInstance == "" {
 		serviceInstance, err = this.selectService("Which instance do you want to delete ? (dump will be really delete after a determined period)")
-		if err != nil {
-			return err
-		}
-	} else {
-		err = this.checkIsDbDumperInstance(serviceInstance)
 		if err != nil {
 			return err
 		}

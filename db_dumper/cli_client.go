@@ -161,7 +161,7 @@ func (this *DbDumperManager) isDbDumperInstance(instance string) bool {
 	}
 	return service.ServiceOffering.Name == this.serviceName
 }
-func (this *DbDumperManager) checkIsDbDumperInstance(instance string) error {
+func (this *DbDumperManager) CheckIsDbDumperInstance(instance string) error {
 	if (!this.isDbDumperInstance(instance)) {
 		return errors.New("Instance " + instance + " is not an instance of db-dumper-service")
 	}

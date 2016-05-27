@@ -1,7 +1,7 @@
 plugins:
   name: db-dumper
   description: Help you to manipulate db-dumper service -> https://github.com/Orange-OpenSource/db-dumper-service (CLI v6.7.0+)
-  version: 1.1.0
+  version: 1.1.1
   created: %date%
   updated: %date_updated%
   company: Orange
