@@ -92,6 +92,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 				},
 				cli.StringFlag{
 					Name: "source-instance",
+					Value: "",
 					Usage: "The db dumper service instance where dumps should be retrieved (this can be the service instance you passed in create e.g.: mydb)",
 					Destination: &sourceInstance,
 				},
@@ -102,13 +103,16 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 				if len(cg.Args()) == 0 {
 					checkError(errors.New("you must provide a service name or an url to a target database"))
 				}
+				instanceName := ""
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
 				prefix, err := dbDumperManager.GetNamePrefix()
 				checkError(err)
 				suffix, _ := dbDumperManager.GetNameSuffix()
-				instanceName := prefix + sourceInstance + suffix
-				err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-				if err != nil {
+				if sourceInstance != "" {
+					instanceName = prefix + sourceInstance + suffix
+					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
+				}
+				if err != nil && instanceName != "" {
 					instanceName = sourceInstance
 					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					checkError(err)
