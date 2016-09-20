@@ -8,6 +8,11 @@ import (
 	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper"
 	"github.com/codegangsta/cli"
 	"github.com/cloudfoundry/cli/cf/errors"
+	"github.com/mitchellh/go-homedir"
+	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper/model"
+	"encoding/json"
+	"path"
+	"io/ioutil"
 )
 
 /*
@@ -18,12 +23,17 @@ import (
 type BasicPlugin struct{}
 
 var version_major int = 1
-var version_minor int = 1
-var version_build int = 2
+var version_minor int = 3
+var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
+var configFile string = ".db-dumper"
 var serviceName string
 var sourceInstance string
+var tags string
+var seeAllDumps bool
 var plan string
+var org string
+var space string
 var showUrl bool
 var recent bool
 var original bool
@@ -38,17 +48,20 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 	if args[0] != "db-dumper" {
 		return
 	}
+
 	app := cli.NewApp()
+	if !configFileExist() {
+		registerConfig(&model.Config{
+			Target: db_dumper.SERVICE_NAME,
+		})
+	}
+	config := retrieveConfig()
+	serviceName = config.Target
+
 	app.Name = "db-dumper"
 	app.Version = fmt.Sprintf("%d.%d.%d", version_major, version_minor, version_build)
 	app.Usage = "Help you to manipulate db-dumper service"
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name: "name, n",
-			Value: db_dumper.SERVICE_NAME,
-			Usage: helpText,
-			Destination: &serviceName,
-		},
 		cli.BoolFlag{
 			Name: "verbose, vvv, vv",
 			Usage: "Set the flag if you want to see all output from cloudfoundry cli",
@@ -59,6 +72,21 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 		println("Hello friend!")
 	}
 	app.Commands = []cli.Command{
+		{
+			Name:      "target",
+			Aliases:     []string{"t"},
+
+			Usage:     "Target a db-dumper service",
+			ArgsUsage: "[db-dumper-service]",
+			Description: "Pass the db-dumper service name, default is db-dumper-service (e.g.: db-dumper-service-dev)",
+			Action: func(cg *cli.Context) {
+				if len(cg.Args()) == 0 {
+					checkError(errors.New("you must provide a db-dumper-service service name"))
+				}
+				config.Target = cg.Args().First()
+				registerConfig(config)
+			},
+		},
 		{
 			Name:      "create",
 			Aliases:     []string{"c"},
@@ -71,13 +99,18 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Usage: "Choose the plan to use. If not set it will ask you to choose one from a list",
 					Destination: &plan,
 				},
+				cli.StringFlag{
+					Name: "tags",
+					Usage: "Pass a list of tags to create a dump with these tags (e.g.: --tags=mytag1,mytag2...)",
+					Destination: &tags,
+				},
 			},
 			Action: func(cg *cli.Context) {
 				if len(cg.Args()) == 0 {
 					checkError(errors.New("you must provide a service name or an url to a database"))
 				}
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				err := dbDumperManager.CreateDump(cg.Args().First(), plan)
+				err := dbDumperManager.CreateDump(cg.Args().First(), plan, tags)
 				checkError(err)
 			},
 		},
@@ -89,6 +122,26 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Name: "recent",
 					Usage: "Restore from the most recent dump",
 					Destination: &recent,
+				},
+				cli.BoolFlag{
+					Name: "see-all-dumps",
+					Usage: "Restore by selecting one of dumps available for the targetted database (made by all db-dumper service instance linked to this database)",
+					Destination: &seeAllDumps,
+				},
+				cli.StringFlag{
+					Name: "tags",
+					Usage: "Restore by selecting one of dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
+					Destination: &tags,
+				},
+				cli.StringFlag{
+					Name: "org, o",
+					Usage: "Org which contain the service name passed",
+					Destination: &org,
+				},
+				cli.StringFlag{
+					Name: "space, s",
+					Usage: "Space which contain the service name passed",
+					Destination: &space,
 				},
 				cli.StringFlag{
 					Name: "source-instance",
@@ -117,7 +170,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 					checkError(err)
 				}
-				err = dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName)
+				err = dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName, org, space, seeAllDumps, tags)
 				checkError(err)
 			},
 		},
@@ -166,6 +219,16 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Usage: "If you want to see download url and dashboard url",
 					Destination: &showUrl,
 				},
+				cli.BoolFlag{
+					Name: "see-all-dumps",
+					Usage: "See all dumps for the database (made by all db-dumper service instance linked to this database)",
+					Destination: &seeAllDumps,
+				},
+				cli.StringFlag{
+					Name: "tags",
+					Usage: "See dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
+					Destination: &tags,
+				},
 			},
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
@@ -181,10 +244,10 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
-					err = dbDumperManager.ListFromInstanceName(instanceName, showUrl)
+					err = dbDumperManager.ListFromInstanceName(instanceName, showUrl, seeAllDumps, tags)
 					checkError(err)
 				} else {
-					err := dbDumperManager.List(showUrl)
+					err := dbDumperManager.List(showUrl, seeAllDumps, tags)
 					checkError(err)
 				}
 
@@ -222,6 +285,16 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Usage: "Show file directly in stdout (service instance is no more optionnal and you need to use flag --dump-number or --recent)",
 					Destination: &inStdout,
 				},
+				cli.BoolFlag{
+					Name: "see-all-dumps",
+					Usage: "Download dumps by selecting one of dumps available for the targetted database (made by all db-dumper service instance linked to this database)",
+					Destination: &seeAllDumps,
+				},
+				cli.StringFlag{
+					Name: "tags",
+					Usage: "Download dumps by selecting one of dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
+					Destination: &tags,
+				},
 			},
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
@@ -236,10 +309,10 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
-					err = dbDumperManager.DownloadDumpFromInstanceName(instanceName, skipInsecure, recent, inStdout, original, dumpNumber)
+					err = dbDumperManager.DownloadDumpFromInstanceName(instanceName, skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
 					checkError(err)
 				} else {
-					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber)
+					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
 					checkError(err)
 				}
 
@@ -262,6 +335,16 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Value: "",
 					Destination: &dumpNumber,
 				},
+				cli.BoolFlag{
+					Name: "see-all-dumps",
+					Usage: "Show dumps by selecting one of dumps available for the targetted database (made by all db-dumper service instance linked to this database)",
+					Destination: &seeAllDumps,
+				},
+				cli.StringFlag{
+					Name: "tags",
+					Usage: "Show dumps by selecting one of dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
+					Destination: &tags,
+				},
 			},
 			Action: func(cg *cli.Context) {
 				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
@@ -276,11 +359,11 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
 						checkError(err)
 					}
-					err = dbDumperManager.ShowDumpFromInstanceName(instanceName, recent, dumpNumber)
+					err = dbDumperManager.ShowDumpFromInstanceName(instanceName, recent, dumpNumber, seeAllDumps, tags)
 					checkError(err)
 
 				} else {
-					err := dbDumperManager.ShowDump(recent, dumpNumber)
+					err := dbDumperManager.ShowDump(recent, dumpNumber, seeAllDumps, tags)
 					checkError(err)
 				}
 
@@ -316,6 +399,30 @@ func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 			},
 		},
 	}
+}
+func registerConfig(config *model.Config) {
+	data, err := json.Marshal(config)
+	checkError(err)
+	ioutil.WriteFile(getConfigFileLocation(), data, 0644)
+}
+func configFileExist() bool {
+	if _, err := os.Stat(getConfigFileLocation()); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+func retrieveConfig() *model.Config {
+	data, err := ioutil.ReadFile(getConfigFileLocation())
+	checkError(err)
+	config := &model.Config{}
+	json.Unmarshal(data, config)
+	checkError(err)
+	return config
+}
+func getConfigFileLocation() string {
+	userDir, err := homedir.Dir()
+	checkError(err)
+	return path.Join(userDir, configFile)
 }
 func warning(message string, err error) {
 	fmt.Print("Warning: ")

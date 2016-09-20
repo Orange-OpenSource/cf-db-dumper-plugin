@@ -1,0 +1,99 @@
+{
+	"ImportPath": "github.com/Orange-OpenSource/db-dumper-cli-plugin",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v74",
+	"Deps": [
+		{
+			"ImportPath": "github.com/cheggaaa/pb",
+			"Comment": "go1.0-55-ge67c2c3",
+			"Rev": "e67c2c3b91b15e81659790a8644e0d3b4a40271d"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/cli/cf/errors",
+			"Comment": "v6.18.0-69-g1de19f7",
+			"Rev": "1de19f7a7228094885b4672a9dca43b9dc1564b5"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/cli/cf/i18n",
+			"Comment": "v6.18.0-69-g1de19f7",
+			"Rev": "1de19f7a7228094885b4672a9dca43b9dc1564b5"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/cli/cf/resources",
+			"Comment": "v6.18.0-69-g1de19f7",
+			"Rev": "1de19f7a7228094885b4672a9dca43b9dc1564b5"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/cli/plugin",
+			"Comment": "v6.18.0-69-g1de19f7",
+			"Rev": "1de19f7a7228094885b4672a9dca43b9dc1564b5"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/cli/plugin/models",
+			"Comment": "v6.18.0-69-g1de19f7",
+			"Rev": "1de19f7a7228094885b4672a9dca43b9dc1564b5"
+		},
+		{
+			"ImportPath": "github.com/codegangsta/cli",
+			"Comment": "v1.11.1-28-g0ab42fd",
+			"Rev": "0ab42fd482c27cf2c95e7794ad3bb2082c2ab2d7"
+		},
+		{
+			"ImportPath": "github.com/daviddengcn/go-colortext",
+			"Rev": "3b18c8575a432453d41fdafb340099fff5bba2f7"
+		},
+		{
+			"ImportPath": "github.com/dustin/go-humanize",
+			"Rev": "8929fe90cee4b2cb9deb468b51fb34eba64d1bf0"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-runewidth",
+			"Comment": "v0.0.1",
+			"Rev": "d6bea18f789704b5f83375793155289da36a3c7f"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/go-homedir",
+			"Rev": "756f7b183b7ab78acdbbee5c7f392838ed459dda"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n",
+			"Comment": "v1.3.0",
+			"Rev": "e89b669dd6cf08115d1eaee6c127bb13081fb20f"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n/bundle",
+			"Comment": "v1.3.0",
+			"Rev": "e89b669dd6cf08115d1eaee6c127bb13081fb20f"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n/language",
+			"Comment": "v1.3.0",
+			"Rev": "e89b669dd6cf08115d1eaee6c127bb13081fb20f"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n/translation",
+			"Comment": "v1.3.0",
+			"Rev": "e89b669dd6cf08115d1eaee6c127bb13081fb20f"
+		},
+		{
+			"ImportPath": "github.com/olekukonko/tablewriter",
+			"Rev": "8d0265a48283795806b872b4728c67bf5c777f20"
+		},
+		{
+			"ImportPath": "github.com/olekukonko/ts",
+			"Rev": "ecf753e7c962639ab5a1fb46f7da627d4c0a04b8"
+		},
+		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Rev": "d41af8bb6a7704f00bc3b7cba9355ae6a5a80048"
+		},
+		{
+			"ImportPath": "github.com/skratchdot/open-golang/open",
+			"Rev": "c8748311a7528d0ba7330d302adbc5a677ef9c9e"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
+		}
+	]
+}

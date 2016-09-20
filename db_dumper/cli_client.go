@@ -121,20 +121,30 @@ func (this *DbDumperManager) cliCommand(command ...string) ([]string, error) {
 	output = strings.Split(strings.Join(output, "\n"), "\n")
 	return output, err
 }
-func (this *DbDumperManager) getDumps(serviceInstance string) ([]model.Dump, error) {
+func (this *DbDumperManager) getCredentials(serviceInstance string, seeAllDumps bool, tags []string) (model.Credentials, error) {
 	var err error
-	command := []string{"create-service-key", serviceInstance, "plugin-key-" + serviceInstance}
+	bindingParameter := &model.BindingParameter{
+		SeeAllDumps: seeAllDumps,
+	}
+	if tags != nil {
+		bindingParameter.FindByTags = tags
+	}
+	commandJson, err := this.generateJsonForBindingParameter(bindingParameter)
+	if err != nil {
+		return model.Credentials{}, err
+	}
+	command := []string{"create-service-key", serviceInstance, "plugin-key-" + serviceInstance, "-c", commandJson}
 	_, err = this.cliCommand(command...)
 	if err != nil {
-		return nil, err
+		return model.Credentials{}, err
 	}
 	command = []string{"service-key", serviceInstance, "plugin-key-" + serviceInstance}
 	output, err := this.cliCommand(command...)
 	if err != nil {
-		return nil, err
+		return model.Credentials{}, err
 	}
 	if len(output) < 2 {
-		return nil, err
+		return model.Credentials{}, err
 	}
 	var credentials model.Credentials
 	datasUnparsed := output[2:]
@@ -145,13 +155,13 @@ func (this *DbDumperManager) getDumps(serviceInstance string) ([]model.Dump, err
 	byt := []byte(jsonData)
 	err = json.Unmarshal(byt, &credentials)
 	if err != nil {
-		return nil, err
+		return model.Credentials{}, err
 	}
 	err = this.deleteServiceKey(serviceInstance)
 	if err != nil {
-		return nil, err
+		return model.Credentials{}, err
 	}
-	return credentials.Dumps, nil
+	return credentials, nil
 }
 func (this *DbDumperManager) deleteServiceKey(serviceInstance string) error {
 	command := []string{"delete-service-key", serviceInstance, "plugin-key-" + serviceInstance, "-f"}
@@ -171,7 +181,7 @@ func (this *DbDumperManager) CheckIsDbDumperInstance(instance string) error {
 	}
 	return nil
 }
-func (this *DbDumperManager) generateJsonFrom(template string, values ...interface{}) (string, error) {
+func (this *DbDumperManager) generateJsonForParameter(parameter *model.Parameter) (string, error) {
 	token, err := this.cliConnection.AccessToken()
 	if err != nil {
 		return "", nil
@@ -179,14 +189,31 @@ func (this *DbDumperManager) generateJsonFrom(template string, values ...interfa
 	if strings.HasPrefix(token, "bearer ") {
 		token = strings.TrimPrefix(token, "bearer ")
 	}
-	org, err := this.cliConnection.GetCurrentOrg()
+	if parameter.Org == "" {
+		org, err := this.cliConnection.GetCurrentOrg()
+		if err != nil {
+			return "", nil
+		}
+		parameter.Org = org.Name
+	}
+	if parameter.Space == "" {
+		space, err := this.cliConnection.GetCurrentSpace()
+		if err != nil {
+			return "", nil
+		}
+		parameter.Space = space.Name
+	}
+	parameter.CfUserToken = token
+	parameterInJson, err := json.Marshal(parameter)
 	if err != nil {
 		return "", nil
 	}
-	space, err := this.cliConnection.GetCurrentSpace()
+	return string(parameterInJson), nil
+}
+func (this *DbDumperManager) generateJsonForBindingParameter(bindingParameter *model.BindingParameter) (string, error) {
+	parameterInJson, err := json.Marshal(bindingParameter)
 	if err != nil {
 		return "", nil
 	}
-	values = append(values, token, org.Name, space.Name)
-	return fmt.Sprintf(template, values...), nil
+	return string(parameterInJson), nil
 }

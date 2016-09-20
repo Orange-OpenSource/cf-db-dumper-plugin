@@ -12,7 +12,7 @@ import (
 )
 
 func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeList []string, defaultValueName, defaultValue string) (string, error) {
-	fmt.Println("Available " + typeToSelect + ":")
+	fmt.Println("Which " + typeToSelect + " do you want ?")
 
 	for num, typeFlat := range typeList {
 		ct.Foreground(ct.Blue, false)
@@ -23,6 +23,16 @@ func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeL
 
 	typeSelect := ""
 	reader := bufio.NewReader(os.Stdin)
+	typeSelect = this.getOnlyChoice(typeList)
+	if typeSelect != "" {
+		fmt.Println("")
+		fmt.Print("Only one choice is available, we choose ")
+		ct.Foreground(ct.Blue, false)
+		fmt.Print(typeSelect)
+		ct.ResetColor()
+		fmt.Println(" for you.")
+		return typeSelect, nil
+	}
 	for true {
 		fmt.Println("")
 		fmt.Println(msg)
@@ -76,14 +86,12 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("Available " + this.serviceName + " instances")
+	fmt.Println("Which " + this.serviceName + " instances do you want ?")
 	firstServiceInstance := ""
 	for num, serviceInstanceFlat := range serviceInstances {
-		if strings.HasPrefix(serviceInstanceFlat, prefix) {
-			serviceInstanceFlat = strings.TrimPrefix(serviceInstanceFlat, prefix)
-		}
-		if strings.HasSuffix(serviceInstanceFlat, service_name_suffix) {
-			serviceInstanceFlat = strings.TrimSuffix(serviceInstanceFlat, service_name_suffix)
+		serviceInstanceFlat, err = this.removeXFixFromServiceName(serviceInstanceFlat)
+		if err != nil {
+			return "", err
 		}
 		if num == 0 {
 			firstServiceInstance = serviceInstanceFlat
@@ -94,6 +102,20 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 		fmt.Println(". " + serviceInstanceFlat)
 	}
 	reader := bufio.NewReader(os.Stdin)
+	serviceInstance = this.getOnlyChoice(serviceInstances)
+	if serviceInstance != "" {
+		serviceInstanceFlat, err := this.removeXFixFromServiceName(serviceInstance)
+		if err != nil {
+			return "", err
+		}
+		fmt.Println("")
+		fmt.Print("Only one choice is available, we choose ")
+		ct.Foreground(ct.Blue, false)
+		fmt.Print(serviceInstanceFlat)
+		ct.ResetColor()
+		fmt.Println(" for you.")
+		return serviceInstance, nil
+	}
 	for true {
 		fmt.Println("")
 		fmt.Println(msg)
@@ -118,10 +140,30 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 		if err == nil {
 			break
 		}
+		serviceInstance = ""
 		showError(err)
 		continue
 	}
 	return serviceInstance, nil
+}
+func (this *DbDumperManager) removeXFixFromServiceName(serviceInstance string) (string, error) {
+	prefix, err := this.GetNamePrefix()
+	if err != nil {
+		return "", err
+	}
+	if strings.HasPrefix(serviceInstance, prefix) {
+		serviceInstance = strings.TrimPrefix(serviceInstance, prefix)
+	}
+	if strings.HasSuffix(serviceInstance, service_name_suffix) {
+		serviceInstance = strings.TrimSuffix(serviceInstance, service_name_suffix)
+	}
+	return serviceInstance, nil
+}
+func (this *DbDumperManager) getOnlyChoice(choices []string) string {
+	if len(choices) != 1 {
+		return ""
+	}
+	return choices[0]
 }
 func (this *DbDumperManager) selectPlan() (string, error) {
 	fmt.Println("Searching available plans...")
@@ -137,11 +179,37 @@ func (this *DbDumperManager) selectPlan() (string, error) {
 	}
 	return plan, nil
 }
-func (this *DbDumperManager) selectDump(serviceInstance string, recent bool, dumpDateOrNumber string) (model.Dump, error) {
-	dumps, err := this.getDumps(serviceInstance)
+func (this *DbDumperManager) askYesOrNo(message string, noByDefault bool) bool {
+	var defaultMessage string
+	var defaultValue string
+	var defaultReturn bool
+	if noByDefault {
+		defaultMessage = "y/N"
+		defaultValue = "y"
+		defaultReturn = true
+	} else {
+		defaultMessage = "Y/n"
+		defaultValue = "n"
+		defaultReturn = false
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(fmt.Sprintf(message, defaultMessage))
+	forceBytes, _, err := reader.ReadLine()
+	if err != nil {
+		return !defaultReturn
+	}
+	force := string(forceBytes)
+	if (strings.Contains(strings.ToLower(force), defaultValue)) {
+		return defaultReturn
+	}
+	return !defaultReturn
+}
+func (this *DbDumperManager) selectDump(serviceInstance string, recent bool, dumpDateOrNumber string, seeAllDumps bool, tags string) (model.Dump, error) {
+	credentials, err := this.getCredentials(serviceInstance, seeAllDumps, this.convertTags(tags))
 	if err != nil {
 		return model.Dump{}, err
 	}
+	dumps := credentials.Dumps
 	if len(dumps) == 0 {
 		return model.Dump{}, errors.New("There is no dumps available")
 	}
@@ -167,14 +235,14 @@ func (this *DbDumperManager) selectDump(serviceInstance string, recent bool, dum
 			createdAt = dumps[0].CreatedAt
 		}
 	}
-	var selectedDump model.Dump
+	var selectedDump model.Dump = model.Dump{}
 	for _, dump := range dumps {
 		if dump.CreatedAt == createdAt {
 			selectedDump = dump
 			break
 		}
 	}
-	if selectedDump == (model.Dump{}) {
+	if selectedDump.Filename == "" {
 		return model.Dump{}, errors.New("The dump at the date of " + createdAt + " doesn't exist")
 	}
 	return selectedDump, nil
