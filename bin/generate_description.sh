@@ -13,7 +13,7 @@ then
     curl https://getcomposer.org/composer.phar -o $composer_file
 fi
 
-if [ ! -f "$CURRENTDIR/out/manifest-generator_linux_amd64" ]
+if [ ! -f "$CURRENTDIR/out/db-dumper_linux_amd64" ]
 then
     echo "Need to build every versions."
     $CURRENTDIR/bin/build-all.sh
