@@ -1,6 +1,6 @@
 plugins:
   name: db-dumper
-  description: Help you to manipulate db-dumper service -> https://github.com/Orange-OpenSource/db-dumper-service (CLI v6.7.0+)
+  description: Help you to manipulate db-dumper service -> https://github.com/orange-cloudfoundry/db-dumper-service (CLI v6.7.0+)
   version: 1.1.2
   created: %date%
   updated: %date_updated%
@@ -9,7 +9,7 @@ plugins:
   - name: Arthur Halet
     homepage: https://github.com/ArthurHlt
     contact: arthur.halet@orange.com
-  homepage: https://github.com/Orange-OpenSource/db-dumper-cli-plugin
+  homepage: https://github.com/orange-cloudfoundry/db-dumper-cli-plugin
   binaries:
   - platform: osx
     url: %plugins.homepage%/releases/download/v%plugins.version%/%plugins.name%_darwin_amd64
