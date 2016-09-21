@@ -4,10 +4,10 @@ import (
 	"errors"
 	"strings"
 	"strconv"
-	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper/model"
+	"github.com/orange-cloudfoundry/db-dumper-cli-plugin/db_dumper/model"
 	"encoding/json"
 	"fmt"
-	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper/progress_bar"
+	"github.com/orange-cloudfoundry/db-dumper-cli-plugin/db_dumper/progress_bar"
 	"time"
 )
 

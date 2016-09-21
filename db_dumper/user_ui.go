@@ -8,7 +8,7 @@ import (
 	"bufio"
 	"os"
 	"github.com/daviddengcn/go-colortext"
-	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper/model"
+	"github.com/orange-cloudfoundry/db-dumper-cli-plugin/db_dumper/model"
 )
 
 func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeList []string, defaultValueName, defaultValue string) (string, error) {

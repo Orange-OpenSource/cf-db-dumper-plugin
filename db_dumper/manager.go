@@ -10,7 +10,7 @@ import (
 	"github.com/daviddengcn/go-colortext"
 	"net/url"
 	"github.com/satori/go.uuid"
-	"github.com/Orange-OpenSource/db-dumper-cli-plugin/db_dumper/model"
+	"github.com/orange-cloudfoundry/db-dumper-cli-plugin/db_dumper/model"
 	"github.com/olekukonko/tablewriter"
 	"crypto/md5"
 	"encoding/hex"
