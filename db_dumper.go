@@ -20,14 +20,16 @@ import (
 *	be found at  "github.com/cloudfoundry/cli/plugin/plugin.go"
 *
  */
-type BasicPlugin struct{}
+type BasicPlugin struct {
+	config          *model.Config
+	dbDumperManager *db_dumper.DbDumperManager
+}
 
 var version_major int = 1
 var version_minor int = 3
 var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
 var configFile string = ".db-dumper"
-var serviceName string
 var sourceInstance string
 var tags string
 var seeAllDumps bool
@@ -55,9 +57,8 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Target: db_dumper.SERVICE_NAME,
 		})
 	}
-	config := retrieveConfig()
-	serviceName = config.Target
-
+	c.config = retrieveConfig()
+	c.dbDumperManager = db_dumper.NewDbDumperManager(c.config.Target, cliConnection, verboseMode)
 	app.Name = "db-dumper"
 	app.Version = fmt.Sprintf("%d.%d.%d", version_major, version_minor, version_build)
 	app.Usage = "Help you to manipulate db-dumper service"
@@ -79,13 +80,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 			Usage:     "Target a db-dumper service",
 			ArgsUsage: "[db-dumper-service]",
 			Description: "Pass the db-dumper service name, default is db-dumper-service (e.g.: db-dumper-service-dev)",
-			Action: func(cg *cli.Context) {
-				if len(cg.Args()) == 0 {
-					checkError(errors.New("you must provide a db-dumper-service service name"))
-				}
-				config.Target = cg.Args().First()
-				registerConfig(config)
-			},
+			Action: c.targetCommand,
 		},
 		{
 			Name:      "create",
@@ -105,14 +100,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Destination: &tags,
 				},
 			},
-			Action: func(cg *cli.Context) {
-				if len(cg.Args()) == 0 {
-					checkError(errors.New("you must provide a service name or an url to a database"))
-				}
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				err := dbDumperManager.CreateDump(cg.Args().First(), plan, tags)
-				checkError(err)
-			},
+			Action: c.createCommand,
 		},
 		{
 			Name:      "restore",
@@ -150,29 +138,9 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Destination: &sourceInstance,
 				},
 			},
-			Usage:     "Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
+			Usage:     "Restore a dump to a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
 			ArgsUsage: "[service-name-or-url-of-your-db]",
-			Action: func(cg *cli.Context) {
-				if len(cg.Args()) == 0 {
-					checkError(errors.New("you must provide a service name or an url to a target database"))
-				}
-				instanceName := ""
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				prefix, err := dbDumperManager.GetNamePrefix()
-				checkError(err)
-				suffix, _ := dbDumperManager.GetNameSuffix()
-				if sourceInstance != "" {
-					instanceName = prefix + sourceInstance + suffix
-					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-				}
-				if err != nil && instanceName != "" {
-					instanceName = sourceInstance
-					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-					checkError(err)
-				}
-				err = dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName, org, space, seeAllDumps, tags)
-				checkError(err)
-			},
+			Action: c.restoreCommand,
 		},
 		{
 			Name:      "delete",
@@ -186,27 +154,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Destination: &force,
 				},
 			},
-			Action: func(cg *cli.Context) {
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				if len(cg.Args()) > 0 {
-					prefix, err := dbDumperManager.GetNamePrefix()
-					checkError(err)
-					suffix, _ := dbDumperManager.GetNameSuffix()
-					instanceName := prefix + cg.Args().First() + suffix
-					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-					if err != nil {
-						instanceName = cg.Args().First()
-						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-						checkError(err)
-					}
-					err = dbDumperManager.DeleteDump(instanceName, force)
-					checkError(err)
-				} else {
-					err := dbDumperManager.DeleteDump("", force)
-					checkError(err)
-				}
-
-			},
+			Action: c.deleteCommand,
 		},
 		{
 			Name:      "list",
@@ -230,28 +178,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Destination: &tags,
 				},
 			},
-			Action: func(cg *cli.Context) {
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-
-				if len(cg.Args()) > 0 {
-					prefix, err := dbDumperManager.GetNamePrefix()
-					checkError(err)
-					suffix, _ := dbDumperManager.GetNameSuffix()
-					instanceName := prefix + cg.Args().First() + suffix
-					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-					if err != nil {
-						instanceName = cg.Args().First()
-						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-						checkError(err)
-					}
-					err = dbDumperManager.ListFromInstanceName(instanceName, showUrl, seeAllDumps, tags)
-					checkError(err)
-				} else {
-					err := dbDumperManager.List(showUrl, seeAllDumps, tags)
-					checkError(err)
-				}
-
-			},
+			Action: c.listCommand,
 		},
 		{
 			Name:      "download",
@@ -296,27 +223,7 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Destination: &tags,
 				},
 			},
-			Action: func(cg *cli.Context) {
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				if len(cg.Args()) > 0 {
-					prefix, err := dbDumperManager.GetNamePrefix()
-					checkError(err)
-					suffix, _ := dbDumperManager.GetNameSuffix()
-					instanceName := prefix + cg.Args().First() + suffix
-					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-					if err != nil {
-						instanceName = cg.Args().First()
-						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-						checkError(err)
-					}
-					err = dbDumperManager.DownloadDumpFromInstanceName(instanceName, skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
-					checkError(err)
-				} else {
-					err := dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
-					checkError(err)
-				}
-
-			},
+			Action: c.downloadCommand,
 		},
 		{
 			Name:      "open",
@@ -346,33 +253,103 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 					Destination: &tags,
 				},
 			},
-			Action: func(cg *cli.Context) {
-				dbDumperManager := db_dumper.NewDbDumperManager(serviceName, cliConnection, verboseMode)
-				if len(cg.Args()) > 0 {
-					prefix, err := dbDumperManager.GetNamePrefix()
-					checkError(err)
-					suffix, _ := dbDumperManager.GetNameSuffix()
-					instanceName := prefix + cg.Args().First() + suffix
-					err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-					if err != nil {
-						instanceName = cg.Args().First()
-						err = dbDumperManager.CheckIsDbDumperInstance(instanceName)
-						checkError(err)
-					}
-					err = dbDumperManager.ShowDumpFromInstanceName(instanceName, recent, dumpNumber, seeAllDumps, tags)
-					checkError(err)
-
-				} else {
-					err := dbDumperManager.ShowDump(recent, dumpNumber, seeAllDumps, tags)
-					checkError(err)
-				}
-
-			},
+			Action: c.showCommand,
 		},
 	}
 	app.Run(args)
 }
+func (c *BasicPlugin) showCommand(cg *cli.Context) {
+	if len(cg.Args()) > 0 {
+		instanceName := c.getInstanceName(cg.Args().First())
+		err := c.dbDumperManager.ShowDumpFromInstanceName(instanceName, recent, dumpNumber, seeAllDumps, tags)
+		checkError(err)
 
+	} else {
+		err := c.dbDumperManager.ShowDump(recent, dumpNumber, seeAllDumps, tags)
+		checkError(err)
+	}
+
+}
+func (c *BasicPlugin) downloadCommand(cg *cli.Context) {
+	if len(cg.Args()) > 0 {
+		instanceName := c.getInstanceName(cg.Args().First())
+		err := c.dbDumperManager.DownloadDumpFromInstanceName(instanceName, skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
+		checkError(err)
+	} else {
+		err := c.dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
+		checkError(err)
+	}
+
+}
+func (c *BasicPlugin) listCommand(cg *cli.Context) {
+	if len(cg.Args()) > 0 {
+		instanceName := c.getInstanceName(cg.Args().First())
+		err := c.dbDumperManager.ListFromInstanceName(instanceName, showUrl, seeAllDumps, tags)
+		checkError(err)
+	} else {
+		err := c.dbDumperManager.List(showUrl, seeAllDumps, tags)
+		checkError(err)
+	}
+
+}
+func (c *BasicPlugin) getInstanceName(instanceNameArg string) string {
+	prefix, err := c.dbDumperManager.GetNamePrefix()
+	checkError(err)
+	suffix, _ := c.dbDumperManager.GetNameSuffix()
+	instanceName := prefix + instanceNameArg + suffix
+	err = c.dbDumperManager.CheckIsDbDumperInstance(instanceName)
+	if err != nil {
+		instanceName = instanceNameArg
+		err = c.dbDumperManager.CheckIsDbDumperInstance(instanceName)
+		checkError(err)
+	}
+	return instanceName
+}
+func (c *BasicPlugin) deleteCommand(cg *cli.Context) {
+	if len(cg.Args()) > 0 {
+		instanceName := c.getInstanceName(cg.Args().First())
+		err := c.dbDumperManager.DeleteDump(instanceName, force)
+		checkError(err)
+	} else {
+		err := c.dbDumperManager.DeleteDump("", force)
+		checkError(err)
+	}
+
+}
+func (c *BasicPlugin) restoreCommand(cg *cli.Context) {
+	if len(cg.Args()) == 0 {
+		checkError(errors.New("you must provide a service name or an url to a target database"))
+	}
+	instanceName := ""
+	prefix, err := c.dbDumperManager.GetNamePrefix()
+	checkError(err)
+	suffix, _ := c.dbDumperManager.GetNameSuffix()
+	if sourceInstance != "" {
+		instanceName = prefix + sourceInstance + suffix
+		err = c.dbDumperManager.CheckIsDbDumperInstance(instanceName)
+	}
+	if err != nil && instanceName != "" {
+		instanceName = sourceInstance
+		err = c.dbDumperManager.CheckIsDbDumperInstance(instanceName)
+		checkError(err)
+	}
+	err = c.dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName, org, space, seeAllDumps, tags)
+	checkError(err)
+}
+func (c *BasicPlugin) createCommand(cg *cli.Context) {
+	if len(cg.Args()) == 0 {
+		checkError(errors.New("you must provide a service name or an url to a database"))
+	}
+	err := c.dbDumperManager.CreateDump(cg.Args().First(), plan, tags)
+	checkError(err)
+}
+func (c *BasicPlugin) targetCommand(cg *cli.Context) {
+	if len(cg.Args()) == 0 {
+		checkError(errors.New("you must provide a db-dumper-service service name"))
+	}
+	c.config.Target = cg.Args().First()
+	registerConfig(c.config)
+}
 func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 	return plugin.PluginMetadata{
 		Name: "db-dumper",

@@ -48,7 +48,7 @@ OPTIONS:
 
 ```
 NAME:
-   db-dumper restore - Restore a dump from a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
+   db-dumper restore - Restore a dump to a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)
 
 USAGE:
    db-dumper restore [command options] [service-name-or-url-of-your-db]

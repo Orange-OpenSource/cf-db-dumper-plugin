@@ -311,7 +311,7 @@ func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance strin
 		ct.Foreground(ct.Blue, false)
 		fmt.Print(credentials.DatabaseRef)
 	} else {
-		fmt.Print(" a service instance called ")
+		fmt.Print("a service instance called ")
 		ct.Foreground(ct.Blue, false)
 		fmt.Print(credentials.DatabaseRef)
 	}
