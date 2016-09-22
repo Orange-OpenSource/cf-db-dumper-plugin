@@ -29,7 +29,7 @@ type BasicPlugin struct {
 
 var version_major int = 1
 var version_minor int = 4
-var version_build int = 0
+var version_build int = 1
 var helpText string = "Help you to manipulate db-dumper service"
 var configFile string = ".db-dumper"
 var sourceInstance string
