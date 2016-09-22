@@ -227,11 +227,16 @@ func retrieveConfig() *model.Config {
 	return config
 }
 func getConfigFileLocation() string {
-	userDir, err := homedir.Dir()
-	checkError(err)
+	var userDir string
+	var err error
 	cfHome := os.Getenv(CF_HOME_KEY)
 	if cfHome != "" {
 		userDir = cfHome
+	} else {
+		userDir, err = homedir.Dir()
+		if err != nil {
+			userDir = "./"
+		}
 	}
 	return path.Join(userDir, configFile)
 }
