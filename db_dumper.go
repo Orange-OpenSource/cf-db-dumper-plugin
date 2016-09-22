@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"path"
 	"io/ioutil"
+	"strings"
+	"bytes"
 )
 
 /*
@@ -26,7 +28,7 @@ type BasicPlugin struct {
 }
 
 var version_major int = 1
-var version_minor int = 3
+var version_minor int = 4
 var version_build int = 0
 var helpText string = "Help you to manipulate db-dumper service"
 var configFile string = ".db-dumper"
@@ -39,18 +41,31 @@ var space string
 var showUrl bool
 var recent bool
 var original bool
-var skipInsecure bool
 var force bool
 var inStdout bool
 var dumpNumber string
 var verboseMode bool
+var commandPluginHelpUsage = `   {{.HelpName}} command{{if .Flags}} [command options]{{end}} {{if .ArgsUsage}}{{.ArgsUsage}}{{else}}[arguments...]{{end}}{{if .Description}}
+DESCRIPTION:
+   {{.Description}}{{end}}{{if .Flags}}
+
+OPTIONS:
+   {{range .Flags}}{{.}}
+   {{end}}{{ end }}
+`
+
+const (
+	CF_HOME_KEY = "CF_HOME"
+	SUFFIX_COMMAND = "-dump"
+	APP_NAME = "db-dumper"
+)
 
 func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 	// Ensure that we called the command basic-plugin-command
-	if args[0] != "db-dumper" {
+	if !strings.HasSuffix(args[0], SUFFIX_COMMAND) {
 		return
 	}
-
+	args[0] = strings.TrimSuffix(args[0], SUFFIX_COMMAND)
 	app := cli.NewApp()
 	if !configFileExist() {
 		registerConfig(&model.Config{
@@ -58,205 +73,17 @@ func (c *BasicPlugin) Run(cliConnection plugin.CliConnection, args []string) {
 		})
 	}
 	c.config = retrieveConfig()
-	c.dbDumperManager = db_dumper.NewDbDumperManager(c.config.Target, cliConnection, verboseMode)
-	app.Name = "db-dumper"
+	c.dbDumperManager = db_dumper.NewDbDumperManager(c.config.Target, cliConnection, &verboseMode)
+	app.Name = APP_NAME
 	app.Version = fmt.Sprintf("%d.%d.%d", version_major, version_minor, version_build)
 	app.Usage = "Help you to manipulate db-dumper service"
-	app.Flags = []cli.Flag{
-		cli.BoolFlag{
-			Name: "verbose, vvv, vv",
-			Usage: "Set the flag if you want to see all output from cloudfoundry cli",
-			Destination: &verboseMode,
-		},
-	}
+	app.Flags = []cli.Flag{}
 	app.Action = func(c *cli.Context) {
 		println("Hello friend!")
 	}
-	app.Commands = []cli.Command{
-		{
-			Name:      "target",
-			Aliases:     []string{"t"},
-
-			Usage:     "Target a db-dumper service",
-			ArgsUsage: "[db-dumper-service]",
-			Description: "Pass the db-dumper service name, default is db-dumper-service (e.g.: db-dumper-service-dev)",
-			Action: c.targetCommand,
-		},
-		{
-			Name:      "create",
-			Aliases:     []string{"c"},
-
-			Usage:     "Create a dump from a database service (e.g.: mydb) or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
-			ArgsUsage: "[service-name-or-url-of-your-db]",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name: "plan",
-					Usage: "Choose the plan to use. If not set it will ask you to choose one from a list",
-					Destination: &plan,
-				},
-				cli.StringFlag{
-					Name: "tags",
-					Usage: "Pass a list of tags to create a dump with these tags (e.g.: --tags=mytag1,mytag2...)",
-					Destination: &tags,
-				},
-			},
-			Action: c.createCommand,
-		},
-		{
-			Name:      "restore",
-			Aliases:     []string{"r"},
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "recent",
-					Usage: "Restore from the most recent dump",
-					Destination: &recent,
-				},
-				cli.BoolFlag{
-					Name: "see-all-dumps",
-					Usage: "Restore by selecting one of dumps available for the targetted database (made by all db-dumper service instance linked to this database)",
-					Destination: &seeAllDumps,
-				},
-				cli.StringFlag{
-					Name: "tags",
-					Usage: "Restore by selecting one of dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
-					Destination: &tags,
-				},
-				cli.StringFlag{
-					Name: "org, o",
-					Usage: "Org which contain the service name passed",
-					Destination: &org,
-				},
-				cli.StringFlag{
-					Name: "space, s",
-					Usage: "Space which contain the service name passed",
-					Destination: &space,
-				},
-				cli.StringFlag{
-					Name: "source-instance",
-					Value: "",
-					Usage: "The db dumper service instance where dumps should be retrieved (this can be the service instance you passed in create e.g.: mydb)",
-					Destination: &sourceInstance,
-				},
-			},
-			Usage:     "Restore a dump to a database service or database uri (e.g: mysql://admin:admin@mybase.com:3306/mysuperdb)",
-			ArgsUsage: "[service-name-or-url-of-your-db]",
-			Action: c.restoreCommand,
-		},
-		{
-			Name:      "delete",
-			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
-			Aliases:     []string{"d"},
-			Usage:     "Delete a instance and all its dumps (dumps can be retrieve during a period)",
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "force, f",
-					Usage: "Force deletion without confirmation",
-					Destination: &force,
-				},
-			},
-			Action: c.deleteCommand,
-		},
-		{
-			Name:      "list",
-			Aliases:     []string{"l"},
-			Usage:     "List dumps for an instance",
-			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "show-url, s",
-					Usage: "If you want to see download url and dashboard url",
-					Destination: &showUrl,
-				},
-				cli.BoolFlag{
-					Name: "see-all-dumps",
-					Usage: "See all dumps for the database (made by all db-dumper service instance linked to this database)",
-					Destination: &seeAllDumps,
-				},
-				cli.StringFlag{
-					Name: "tags",
-					Usage: "See dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
-					Destination: &tags,
-				},
-			},
-			Action: c.listCommand,
-		},
-		{
-			Name:      "download",
-			Aliases:     []string{"dl"},
-			Usage:     "Download a dump to your drive",
-			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "skip-ssl-validation, k",
-					Usage: "Skip the ssl validation (for self-signed certificate mainly)",
-					Destination: &skipInsecure,
-				},
-				cli.BoolFlag{
-					Name: "recent",
-					Usage: "Download from the most recent dump",
-					Destination: &recent,
-				},
-				cli.BoolFlag{
-					Name: "original",
-					Usage: "Download the original file (e.g.: download directly sql file instead of compressed file)",
-					Destination: &original,
-				},
-				cli.StringFlag{
-					Name: "dump-number, p",
-					Usage: "Download from the number showed when using 'db-dumper list'",
-					Value: "",
-					Destination: &dumpNumber,
-				},
-				cli.BoolFlag{
-					Name: "stdout, o",
-					Usage: "Show file directly in stdout (service instance is no more optionnal and you need to use flag --dump-number or --recent)",
-					Destination: &inStdout,
-				},
-				cli.BoolFlag{
-					Name: "see-all-dumps",
-					Usage: "Download dumps by selecting one of dumps available for the targetted database (made by all db-dumper service instance linked to this database)",
-					Destination: &seeAllDumps,
-				},
-				cli.StringFlag{
-					Name: "tags",
-					Usage: "Download dumps by selecting one of dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
-					Destination: &tags,
-				},
-			},
-			Action: c.downloadCommand,
-		},
-		{
-			Name:      "open",
-			Aliases:  []string{"o"},
-			Usage:     "Open dump in your browser",
-			ArgsUsage: "[service instance](*optional*, this can be the service instance you passed in create e.g.: mydb)",
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "recent",
-					Usage: "Open dump page from the most recent dump",
-					Destination: &recent,
-				},
-				cli.StringFlag{
-					Name: "dump-number, p",
-					Usage: "Open from the number showed when using 'db-dumper list'",
-					Value: "",
-					Destination: &dumpNumber,
-				},
-				cli.BoolFlag{
-					Name: "see-all-dumps",
-					Usage: "Show dumps by selecting one of dumps available for the targetted database (made by all db-dumper service instance linked to this database)",
-					Destination: &seeAllDumps,
-				},
-				cli.StringFlag{
-					Name: "tags",
-					Usage: "Show dumps by selecting one of dumps marked with tag(s) (e.g.: --tags=mytag1,mytag2...)",
-					Destination: &tags,
-				},
-			},
-			Action: c.showCommand,
-		},
-	}
-	app.Run(args)
+	app.Commands = generateCommand(c)
+	finalArgs := append([]string{APP_NAME}, args...)
+	app.Run(finalArgs)
 }
 func (c *BasicPlugin) showCommand(cg *cli.Context) {
 	if len(cg.Args()) > 0 {
@@ -273,10 +100,10 @@ func (c *BasicPlugin) showCommand(cg *cli.Context) {
 func (c *BasicPlugin) downloadCommand(cg *cli.Context) {
 	if len(cg.Args()) > 0 {
 		instanceName := c.getInstanceName(cg.Args().First())
-		err := c.dbDumperManager.DownloadDumpFromInstanceName(instanceName, skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
+		err := c.dbDumperManager.DownloadDumpFromInstanceName(instanceName, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
 		checkError(err)
 	} else {
-		err := c.dbDumperManager.DownloadDump(skipInsecure, recent, inStdout, original, dumpNumber, seeAllDumps, tags)
+		err := c.dbDumperManager.DownloadDump(recent, inStdout, original, dumpNumber, seeAllDumps, tags)
 		checkError(err)
 	}
 
@@ -333,7 +160,7 @@ func (c *BasicPlugin) restoreCommand(cg *cli.Context) {
 		err = c.dbDumperManager.CheckIsDbDumperInstance(instanceName)
 		checkError(err)
 	}
-	err = c.dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName, org, space, seeAllDumps, tags)
+	err = c.dbDumperManager.RestoreDump(cg.Args().First(), recent, instanceName, org, space, seeAllDumps, tags, force)
 	checkError(err)
 }
 func (c *BasicPlugin) createCommand(cg *cli.Context) {
@@ -351,8 +178,22 @@ func (c *BasicPlugin) targetCommand(cg *cli.Context) {
 	registerConfig(c.config)
 }
 func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
+
+	pluginCommands := []plugin.Command{}
+	commands := generateCommand(c)
+	for _, command := range commands {
+		bufferedHelp := new(bytes.Buffer)
+		cli.HelpPrinter(bufferedHelp, commandPluginHelpUsage, command)
+		pluginCommands = append(pluginCommands, plugin.Command{
+			Name:     command.Name + SUFFIX_COMMAND,
+			HelpText: command.Usage,
+			UsageDetails: plugin.Usage{
+				Usage: bufferedHelp.String(),
+			},
+		})
+	}
 	return plugin.PluginMetadata{
-		Name: "db-dumper",
+		Name: APP_NAME,
 		Version: plugin.VersionType{
 			Major: version_major,
 			Minor: version_minor,
@@ -363,18 +204,7 @@ func (c *BasicPlugin) GetMetadata() plugin.PluginMetadata {
 			Minor: 7,
 			Build: 0,
 		},
-		Commands: []plugin.Command{
-			plugin.Command{
-				Name:     "db-dumper",
-				HelpText: helpText,
-
-				// UsageDetails is optional
-				// It is used to show help of usage of each command
-				UsageDetails: plugin.Usage{
-					Usage: "db-dumper\n   Run db-dumper help to see usage",
-				},
-			},
-		},
+		Commands: pluginCommands,
 	}
 }
 func registerConfig(config *model.Config) {
@@ -399,6 +229,10 @@ func retrieveConfig() *model.Config {
 func getConfigFileLocation() string {
 	userDir, err := homedir.Dir()
 	checkError(err)
+	cfHome := os.Getenv(CF_HOME_KEY)
+	if cfHome != "" {
+		userDir = cfHome
+	}
 	return path.Join(userDir, configFile)
 }
 func warning(message string, err error) {

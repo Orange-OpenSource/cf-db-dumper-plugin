@@ -27,7 +27,7 @@ import (
 type DbDumperManager struct {
 	cliConnection plugin.CliConnection
 	serviceName   string
-	verbose       bool
+	verbose       *bool
 }
 
 const (
@@ -38,14 +38,13 @@ const (
 	service_name_suffix = "-dump"
 )
 
-func NewDbDumperManager(serviceName string, cliConnection plugin.CliConnection, verbose bool) *DbDumperManager {
+func NewDbDumperManager(serviceName string, cliConnection plugin.CliConnection, verbose *bool) *DbDumperManager {
 	return &DbDumperManager{
 		cliConnection: cliConnection,
 		serviceName: serviceName,
 		verbose: verbose,
 	}
 }
-
 func (this *DbDumperManager) CreateDump(service_name_or_url string, plan string, tags string) error {
 	name, err := this.generateName(service_name_or_url)
 	var command []string
@@ -114,20 +113,17 @@ func (this *DbDumperManager) convertTags(tags string) []string {
 	}
 	return tagsInArray
 }
-func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, recent bool, sourceInstance, org, space string, seeAllDumps bool, tags string) error {
+func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, recent bool, sourceInstance, org, space string, seeAllDumps bool, tags string, force bool) error {
 	var serviceInstance string
 	var err error
 	if (org == "") != (space == "") {
 		return errors.New("Org or space parameter is missing")
 	}
-	userReallyWant := this.askYesOrNo("Are you sure to be willing to override database " + target_service_name_or_url + " with content from dump (this can not be undone) ? %s :", false)
-	if !userReallyWant {
-		return nil
-	}
+
 	if sourceInstance != "" {
 		serviceInstance = sourceInstance
 	} else {
-		serviceInstance, err = this.selectService("Which instance do you want to restore to '" + target_service_name_or_url + "' ?")
+		serviceInstance, err = this.selectService("Which db-dumper service instance do you want to restore to the db '" + this.serviceName + "' ?")
 		if err != nil {
 			return err
 		}
@@ -160,6 +156,26 @@ func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, rece
 	if err != nil {
 		return err
 	}
+	if !force {
+		createdAtShow := createdAt
+		if createdAtShow == "" {
+			createdAtShow = "recent"
+		}
+		instanceNameFlat, err := this.removeXFixFromServiceName(target_service_name_or_url)
+		if err != nil {
+			return err
+		}
+		messageConfirmation := fmt.Sprintf(
+			"Are you sure to override database '%s' with dump from '%s' to date '%s' (this can not be undone) ?",
+			instanceNameFlat,
+			serviceInstance,
+			createdAtShow,
+		)
+		userReallyWant := this.askYesOrNo(messageConfirmation + " %s : ", false)
+		if !userReallyWant {
+			return nil
+		}
+	}
 	command = append(command, commandJson)
 	_, err = this.cliCommand(command...)
 	if err != nil {
@@ -167,7 +183,7 @@ func (this *DbDumperManager) RestoreDump(target_service_name_or_url string, rece
 	}
 	return this.waitServiceAction(serviceInstance, "Restoring dump")
 }
-func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdout bool, original bool, dumpDateOrNumber string, seeAllDumps bool, tags string) error {
+func (this *DbDumperManager) DownloadDump(recent bool, inStdout bool, original bool, dumpDateOrNumber string, seeAllDumps bool, tags string) error {
 	if inStdout {
 		return errors.New("To use stdout option you need to pass a service instance.")
 	}
@@ -175,9 +191,9 @@ func (this *DbDumperManager) DownloadDump(skipInsecure bool, recent bool, inStdo
 	if err != nil {
 		return err
 	}
-	return this.DownloadDumpFromInstanceName(serviceInstance, skipInsecure, recent, inStdout, original, dumpDateOrNumber, seeAllDumps, tags)
+	return this.DownloadDumpFromInstanceName(serviceInstance, recent, inStdout, original, dumpDateOrNumber, seeAllDumps, tags)
 }
-func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, skipInsecure bool, recent bool, inStdout bool, original bool, dumpDateOrNumber string, seeAllDumps bool, tags string) error {
+func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string, recent bool, inStdout bool, original bool, dumpDateOrNumber string, seeAllDumps bool, tags string) error {
 	if inStdout && dumpDateOrNumber == "" && !recent {
 		return errors.New("stdout option can only be use with flag --dump-number or --recent")
 	}
@@ -186,6 +202,10 @@ func (this *DbDumperManager) DownloadDumpFromInstanceName(serviceInstance string
 		return err
 	}
 	var tlsConfig *tls.Config
+	skipInsecure, err := this.cliConnection.IsSSLDisabled()
+	if err != nil {
+		return err
+	}
 	if skipInsecure {
 		tlsConfig = &tls.Config{InsecureSkipVerify: skipInsecure}
 	}

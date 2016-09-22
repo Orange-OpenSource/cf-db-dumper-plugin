@@ -14,15 +14,7 @@ import (
 func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeList []string, defaultValueName, defaultValue string) (string, error) {
 	fmt.Println("Which " + typeToSelect + " do you want ?")
 
-	for num, typeFlat := range typeList {
-		ct.Foreground(ct.Blue, false)
-		fmt.Print(strconv.Itoa(num))
-		ct.ResetColor()
-		fmt.Println(". " + typeFlat)
-	}
-
 	typeSelect := ""
-	reader := bufio.NewReader(os.Stdin)
 	typeSelect = this.getOnlyChoice(typeList)
 	if typeSelect != "" {
 		fmt.Println("")
@@ -33,6 +25,15 @@ func (this *DbDumperManager) selectByUser(typeToSelect string, msg string, typeL
 		fmt.Println(" for you.")
 		return typeSelect, nil
 	}
+
+	for num, typeFlat := range typeList {
+		ct.Foreground(ct.Blue, false)
+		fmt.Print(strconv.Itoa(num))
+		ct.ResetColor()
+		fmt.Println(". " + typeFlat)
+	}
+
+	reader := bufio.NewReader(os.Stdin)
 	for true {
 		fmt.Println("")
 		fmt.Println(msg)
@@ -86,7 +87,20 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("Which " + this.serviceName + " instances do you want ?")
+	serviceInstance = this.getOnlyChoice(serviceInstances)
+	if serviceInstance != "" {
+		serviceInstanceFlat, err := this.removeXFixFromServiceName(serviceInstance)
+		if err != nil {
+			return "", err
+		}
+		fmt.Println("")
+		fmt.Print("Only one choice is available, we choose ")
+		ct.Foreground(ct.Blue, false)
+		fmt.Print(serviceInstanceFlat)
+		ct.ResetColor()
+		fmt.Println(" for you.")
+		return serviceInstance, nil
+	}
 	firstServiceInstance := ""
 	for num, serviceInstanceFlat := range serviceInstances {
 		serviceInstanceFlat, err = this.removeXFixFromServiceName(serviceInstanceFlat)
@@ -102,20 +116,6 @@ func (this *DbDumperManager) selectService(msg string) (string, error) {
 		fmt.Println(". " + serviceInstanceFlat)
 	}
 	reader := bufio.NewReader(os.Stdin)
-	serviceInstance = this.getOnlyChoice(serviceInstances)
-	if serviceInstance != "" {
-		serviceInstanceFlat, err := this.removeXFixFromServiceName(serviceInstance)
-		if err != nil {
-			return "", err
-		}
-		fmt.Println("")
-		fmt.Print("Only one choice is available, we choose ")
-		ct.Foreground(ct.Blue, false)
-		fmt.Print(serviceInstanceFlat)
-		ct.ResetColor()
-		fmt.Println(" for you.")
-		return serviceInstance, nil
-	}
 	for true {
 		fmt.Println("")
 		fmt.Println(msg)

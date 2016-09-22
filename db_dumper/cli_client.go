@@ -110,7 +110,7 @@ func (this *DbDumperManager) isDbDumperServiceExist() bool {
 func (this *DbDumperManager) cliCommand(command ...string) ([]string, error) {
 	var output []string
 	var err error
-	if this.verbose {
+	if *this.verbose {
 		output, err = this.cliConnection.CliCommand(command...)
 	} else {
 		output, err = this.cliConnection.CliCommandWithoutTerminalOutput(command...)
