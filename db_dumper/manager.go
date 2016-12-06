@@ -351,7 +351,7 @@ func (this *DbDumperManager) ListFromInstanceNameWithDumps(serviceInstance strin
 		if dump.Tags != nil {
 			tag = strings.Join(dump.Tags, ",")
 		}
-		var data []string = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, humanize.Bytes(dump.Size), tag, strconv.FormatBool(dump.Deleted)}
+		var data []string = []string{strconv.Itoa(index), dump.Filename, dump.CreatedAt, humanize.Bytes(uint64(dump.Size)), tag, strconv.FormatBool(dump.Deleted)}
 		if showUrl {
 			data = append(data, dump.DownloadURL, dump.ShowURL)
 		}

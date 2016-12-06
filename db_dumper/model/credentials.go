@@ -9,7 +9,7 @@ type Credentials struct {
 type Dump struct {
 	Filename    string   `json:"filename"`
 	Deleted     bool     `json:"deleted"`
-	Size        uint64   `json:"size"`
+	Size        float64  `json:"size"`
 	DownloadURL string   `json:"download_url"`
 	CreatedAt   string   `json:"created_at"`
 	DumpID      int      `json:"dump_id"`
