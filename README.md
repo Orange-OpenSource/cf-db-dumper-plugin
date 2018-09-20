@@ -135,14 +135,4 @@ OPTIONS:
 
 ### Plugin fails with "Cannot found service: db-dumper-service"
 
-By default, the CLI plugin assumes that the associated [db-dumper-service](https://github.com/orange-cloudfoundry/db-dumper-service) backend is deployed in the marketplace as a service named `db-dumper-service`. To use the plugin with a service named differently, edit the $CF_HOME/.db-dumper file from 
-
-```json
-{"target":"db-dumper-service"}
-```
-
-into: 
-
-```json
-{"target":"<name-of-the-service-to-use>"}
-```
+By default, the CLI plugin assumes that the associated [db-dumper-service](https://github.com/orange-cloudfoundry/db-dumper-service) backend is deployed in the marketplace as a service named `db-dumper-service`. To use the plugin with a service named differently, use the `target-dump` command specifying the custom service name as argument.
